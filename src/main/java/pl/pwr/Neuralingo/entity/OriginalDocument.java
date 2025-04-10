@@ -5,7 +5,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Map;
 
 @Document(collection = "original_documents")
-public class OrginalDocument extends BaseDocument{
+public class OriginalDocument extends BaseDocument{
 
     private String content;
 
@@ -23,8 +23,17 @@ public class OrginalDocument extends BaseDocument{
 
     private Map<String, Object> formatting;
 
+    private String storagePath; // <- nowo dodane
 
-    public OrginalDocument() {
+    public String getStoragePath() {
+        return storagePath;
+    }
+
+    public void setStoragePath(String storagePath) {
+        this.storagePath = storagePath;
+    }
+
+    public OriginalDocument() {
         super();
     }
 
