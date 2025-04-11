@@ -1,6 +1,4 @@
-Jasne! Oto propozycja estetycznego i czytelnego `README.md` dla projektu **Neuralingo** – aplikacji do tłumaczenia dokumentów za pomocą AI:
 
-```markdown
 # 🌐 Neuralingo – AI Translator for Documents
 
 Neuralingo is an intelligent web application that allows users to **upload documents and instantly translate them using advanced AI models**.  
