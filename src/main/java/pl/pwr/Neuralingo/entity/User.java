@@ -2,6 +2,7 @@ package pl.pwr.Neuralingo.entity;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import pl.pwr.Neuralingo.enums.ROLE;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,18 +19,27 @@ public class User {
     private String firstName;
     private String lastName;
 
-    private String role;
+    private ROLE role;
     private boolean active;
     private String profileImageUrl;
     private LocalDateTime createdAt;
     private LocalDateTime lastLogin;
+    private String nativeLanguage;
 
     private List<String> recentDocumentIds;
 
+    // Konstruktor bezparametrowy (wymagany przez MongoDB)
     public User() {
 
     }
 
+    public String getNativeLanguage() {
+        return nativeLanguage;
+    }
+
+    public void setNativeLanguage(String nativeLanguage) {
+        this.nativeLanguage = nativeLanguage;
+    }
 
     public String getId() {
         return id;
@@ -71,11 +81,11 @@ public class User {
         this.lastName = lastName;
     }
 
-    public String getRole() {
+    public ROLE getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(ROLE role) {
         this.role = role;
     }
 

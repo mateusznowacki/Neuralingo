@@ -16,9 +16,8 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
-
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordService passwordService;
 
     public User getUserById(String id) {
         return userRepository.findById(id).orElse(null);
@@ -39,8 +38,8 @@ public class UserService {
     public void changePassword(String userId, String oldPassword, String newPassword) {
         User user = userRepository.findById(userId).orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        if (passwordEncoder.matches(oldPassword, user.getPassword())) {
-            user.setPassword(passwordEncoder.encode(newPassword));
+        if (passwordService.matches(oldPassword, user.getPassword())) {
+            user.setPassword(passwordService.encodePassword(newPassword));
             userRepository.save(user);
         } else {
             throw new IllegalArgumentException("Old password is incorrect");
@@ -55,4 +54,18 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
+    // Metoda weryfikująca dane logowania
+    public boolean isValidUser(String email, String password) {
+        Optional<User> user = userRepository.findByEmail(email); // Sprawdzamy, czy użytkownik istnieje
+
+        if (user.isPresent()) {
+            // Porównujemy surowe hasło z zakodowanym hasłem przy pomocy PasswordService
+            return passwordService.matches(password, user.get().getPassword());  // Porównanie hasła
+        }
+        return false;
+    }
+
+    public boolean existsByEmail(String email) {
+        return userRepository.findByEmail(email).isPresent();
+    }
 }
