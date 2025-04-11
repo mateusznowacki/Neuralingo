@@ -101,7 +101,7 @@ public class AuthController {
     private void addCookieToResponse(String cookieName, String token, HttpServletResponse response) {
         Cookie cookie = new Cookie(cookieName, token);
         cookie.setHttpOnly(true); // Zapobiega dostępowi do ciasteczka przez JavaScript
-        cookie.setSecure(true);   // Ciasteczko będzie wysyłane tylko przez HTTPS
+        cookie.setSecure(false);   // Ciasteczko będzie wysyłane tylko przez HTTPS
         cookie.setPath("/");      // Ciasteczko jest dostępne w całej aplikacji
         cookie.setMaxAge(3600);   // Opcjonalnie: ustawienie maksymalnego czasu życia ciasteczka (w sekundach)
 

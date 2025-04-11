@@ -7,6 +7,7 @@ import java.util.Map;
 @Document(collection = "translated_documents")
 public class TranslatedDocument {
     private String translatedContent;
+    private String ownerId;
 
     private String targetLanguage;
 
@@ -30,6 +31,13 @@ public class TranslatedDocument {
 
     public TranslatedDocument() {
         super();
+    }
+
+    public String getOwnerId() {
+        return ownerId;
+    }
+    public void setOwnerId(String ownerId) {
+        this.ownerId = ownerId;
     }
 
     public String getTranslatedContent() {
