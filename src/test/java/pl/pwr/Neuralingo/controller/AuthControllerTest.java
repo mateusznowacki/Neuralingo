@@ -14,15 +14,15 @@ import org.springframework.test.web.servlet.MvcResult;
 import pl.pwr.Neuralingo.config.TestBeansConfig;
 import pl.pwr.Neuralingo.dto.auth.LoginRequestDTO;
 import pl.pwr.Neuralingo.dto.auth.RegisterRequestDTO;
-import pl.pwr.Neuralingo.utils.JwtUtil;
-import pl.pwr.Neuralingo.service.UserService;
 import pl.pwr.Neuralingo.service.PasswordService;
+import pl.pwr.Neuralingo.service.UserService;
+import pl.pwr.Neuralingo.utils.JwtUtil;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 @WebMvcTest(AuthController.class)
 @Import(TestBeansConfig.class)
@@ -110,4 +110,47 @@ class AuthControllerTest {
 
         assert actualResponseBody.equals(expectedJson) : "Response body does not match expected!";
     }
+
+
+    @Test
+    void shouldFailToRegisterUserIfEmailAlreadyExists() throws Exception {
+        RegisterRequestDTO dto = new RegisterRequestDTO(dummyEmail, dummyPassword, "Jan", "Kowalski", "PL");
+
+        when(userService.existsByEmail(dto.email())).thenReturn(true);
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isConflict())
+                .andExpect(content().string("User with this email already exists."));
+    }
+
+    @Test
+    void shouldFailLoginWithInvalidCredentials() throws Exception {
+        LoginRequestDTO dto = new LoginRequestDTO(dummyEmail, "wrongpassword");
+
+        when(userService.isValidUser(dummyEmail, "wrongpassword")).thenReturn(false);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string("Invalid email or password."));
+    }
+
+    @Test
+    void shouldFailToRefreshTokenIfInvalid() throws Exception {
+        Cookie cookie = new Cookie("refresh_token", "invalid-token");
+
+        when(jwtUtil.validateToken("invalid-token")).thenReturn(false);
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .with(csrf())
+                        .cookie(cookie))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string("Invalid or expired refresh token."));
+    }
+
 }
