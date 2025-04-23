@@ -32,6 +32,11 @@
         <maven.compiler.target>21</maven.compiler.target>
     </properties>
     <dependencies>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-ai-formrecognizer</artifactId>
+            <version>4.0.6</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springdoc</groupId>
