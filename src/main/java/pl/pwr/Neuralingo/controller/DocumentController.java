@@ -3,6 +3,7 @@ package pl.pwr.Neuralingo.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,8 +36,15 @@ public class DocumentController {
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
-    public ResponseEntity<OriginalDocument> getOriginalDocument(@PathVariable String id) {
-        return documentService.getOriginalDocument(id);
+    public ResponseEntity<byte[]> getOriginalDocument(@PathVariable String id, Authentication authentication) {
+        OriginalDocument doc = documentService.getDocumentByIdAndUser(id, authentication.getName());
+
+        byte[] fileContent = documentService.downloadFromBlob(doc.getStoragePath());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + doc.getTitle() + "\"")
+                .contentType(MediaType.parseMediaType(doc.getFileType()))
+                .body(fileContent);
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -44,4 +52,8 @@ public class DocumentController {
     public ResponseEntity<List<OriginalDocument>> getUserDocuments(Authentication authentication) {
         return ResponseEntity.ok(documentService.getDocumentsByUser(authentication.getName()));
     }
+
+
+
+
 }

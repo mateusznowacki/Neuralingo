@@ -8,34 +8,11 @@ import java.util.Map;
 public class OriginalDocument extends BaseDocument{
 
     private String content;
-
     private String sourceLanguage;
-
-    private String detectedLanguage;
-
-    private int wordCount;
-
-    private int characterCount;
-
     private String fileName;
-
     private String fileType;
+    private String storagePath;
 
-    private Map<String, Object> formatting;
-
-    private String storagePath; // <- nowo dodane
-
-    public String getStoragePath() {
-        return storagePath;
-    }
-
-    public void setStoragePath(String storagePath) {
-        this.storagePath = storagePath;
-    }
-
-    public OriginalDocument() {
-        super();
-    }
 
     public String getContent() {
         return content;
@@ -51,30 +28,6 @@ public class OriginalDocument extends BaseDocument{
 
     public void setSourceLanguage(String sourceLanguage) {
         this.sourceLanguage = sourceLanguage;
-    }
-
-    public String getDetectedLanguage() {
-        return detectedLanguage;
-    }
-
-    public void setDetectedLanguage(String detectedLanguage) {
-        this.detectedLanguage = detectedLanguage;
-    }
-
-    public int getWordCount() {
-        return wordCount;
-    }
-
-    public void setWordCount(int wordCount) {
-        this.wordCount = wordCount;
-    }
-
-    public int getCharacterCount() {
-        return characterCount;
-    }
-
-    public void setCharacterCount(int characterCount) {
-        this.characterCount = characterCount;
     }
 
     public String getFileName() {
@@ -93,11 +46,11 @@ public class OriginalDocument extends BaseDocument{
         this.fileType = fileType;
     }
 
-    public Map<String, Object> getFormatting() {
-        return formatting;
+    public void setStoragePath(String storagePath) {
+        this.storagePath = storagePath;
     }
 
-    public void setFormatting(Map<String, Object> formatting) {
-        this.formatting = formatting;
+    public String getStoragePath() {
+        return storagePath;
     }
 }

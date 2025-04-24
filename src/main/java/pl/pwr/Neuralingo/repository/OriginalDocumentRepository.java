@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface OriginalDocumentRepository extends MongoRepository<OriginalDocument, String> {
     List<OriginalDocument> findByOwnerId(String userId);
+
+    List<OriginalDocument> findAllByOwnerId(String ownerId);
 }

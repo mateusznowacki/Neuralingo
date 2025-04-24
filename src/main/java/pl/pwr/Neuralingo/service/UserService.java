@@ -68,4 +68,10 @@ public class UserService {
     public boolean existsByEmail(String email) {
         return userRepository.findByEmail(email).isPresent();
     }
+
+    public String getDefaultLanguageByUserId(String ownerId) {
+        return userRepository.findById(ownerId)
+                .map(User::getNativeLanguage)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
 }
