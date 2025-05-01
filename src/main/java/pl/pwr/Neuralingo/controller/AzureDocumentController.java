@@ -1,5 +1,7 @@
 package pl.pwr.Neuralingo.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,10 +20,11 @@ public class AzureDocumentController {
     private final DocumentService documentService;
     private final AzureDocumentIntelligenceService azureDocumentIntelligenceService;
     private final AzureDocumentTranslationService translationService;
+ private static final Logger logger = LoggerFactory.getLogger(AzureDocumentController.class);
 
     public AzureDocumentController(DocumentService documentService,
-                                         AzureDocumentIntelligenceService azureDocumentIntelligenceService,
-                                         AzureDocumentTranslationService translationService) {
+                                   AzureDocumentIntelligenceService azureDocumentIntelligenceService,
+                                   AzureDocumentTranslationService translationService) {
         this.documentService = documentService;
         this.azureDocumentIntelligenceService = azureDocumentIntelligenceService;
         this.translationService = translationService;
@@ -43,25 +46,35 @@ public class AzureDocumentController {
         return ResponseEntity.ok(result);
     }
 
-    @PreAuthorize("isAuthenticated()")
-    @PostMapping("/{id}/translate")
+  @PreAuthorize("isAuthenticated()")
+    @PostMapping("/translate/{id}")
     public ResponseEntity<ExtractedDocumentContent> translate(@PathVariable String id,
-                                                              @RequestParam(defaultValue = "en") String lang,
+                                                              @RequestParam(defaultValue = "en") String targetLang,
                                                               Authentication auth) {
-        // 1. weryfikacja dostępu
-        OriginalDocument doc = documentService.getDocumentByIdAndUser(id, auth.getName());
+        logger.info("Wywołano translate dla dokumentu ID: {}", id);
+        logger.info("Żądany język docelowy: {}", targetLang);
 
-        // 2. OCR (można podmienić na cache, jeśli już zapisany)
+        // sprawdzenie użytkownika z tokena
+        String username = auth != null ? auth.getName() : "brak użytkownika";
+        logger.info("Autoryzowany użytkownik: {}", username);
+
+        // 1. weryfikacja dostępu
+        OriginalDocument doc = documentService.getDocumentByIdAndUser(id, username);
+        logger.info("Pobrano dokument: {}", doc.getFileName());
+
+        // 2. OCR
         byte[] bytes = documentService.downloadFromBlob(doc.getStoragePath());
         ExtractedDocumentContent ocr = azureDocumentIntelligenceService.analyzeDocument(bytes, doc.getFileType());
 
+        logger.info("OCR zakończony. Wykryto tekst o długości: {}", ocr.text() != null ? ocr.text().length() : 0);
+
         // 3. tłumaczenie
-        ExtractedDocumentContent translated = translationService.translate(ocr, lang);
+        ExtractedDocumentContent translated = translationService.translate(ocr, targetLang);
+
+        logger.info("Tłumaczenie zakończone.");
 
         return ResponseEntity.ok(translated);
     }
-
-
 
 
 }
