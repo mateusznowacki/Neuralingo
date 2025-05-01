@@ -10,7 +10,7 @@ import pl.pwr.Neuralingo.dto.auth.AccessTokenDTO;
 import pl.pwr.Neuralingo.dto.auth.LoginRequestDTO;
 import pl.pwr.Neuralingo.dto.auth.RegisterRequestDTO;
 import pl.pwr.Neuralingo.entity.User;
-import pl.pwr.Neuralingo.enums.ROLE;
+import pl.pwr.Neuralingo.enums.Role;
 import pl.pwr.Neuralingo.utils.JwtUtil;
 
 import java.time.LocalDateTime;
@@ -39,7 +39,7 @@ public class AuthService {
         user.setFirstName(dto.firstName());
         user.setLastName(dto.lastName());
         user.setNativeLanguage(dto.nativeLanguage());
-        user.setRole(ROLE.USER);
+        user.setRole(Role.USER);
         user.setActive(true);
         user.setCreatedAt(LocalDateTime.now());
         user.setRecentDocumentIds(Collections.emptyList());

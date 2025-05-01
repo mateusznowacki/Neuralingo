@@ -6,9 +6,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import pl.pwr.Neuralingo.dto.docContent.UploadMetadata;
+
+import pl.pwr.Neuralingo.document.content.UploadMetadata;
 import pl.pwr.Neuralingo.entity.OriginalDocument;
 import pl.pwr.Neuralingo.repository.OriginalDocumentRepository;
+import pl.pwr.Neuralingo.enums.DocumentStatus;
+
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -37,9 +40,10 @@ public class DocumentService {
             UploadMetadata metadata = objectMapper.readValue(metadataJson, UploadMetadata.class);
             String title = metadata.title();
 
+            // 1️⃣ Pobierz domyślny język użytkownika (natywny)
             String sourceLanguage = userService.getDefaultLanguageByUserId(ownerId);
 
-            // 1. Najpierw zapisujemy dokument do bazy, żeby dostać ID
+            // 2️⃣ Stwórz pusty dokument i ustaw podstawowe dane
             OriginalDocument document = new OriginalDocument();
             document.setTitle(title);
             document.setSourceLanguage(sourceLanguage);
@@ -47,13 +51,20 @@ public class DocumentService {
             document.setCreatedAt(LocalDateTime.now());
             document.setFileType(file.getContentType());
 
-            document = originalRepo.save(document); // teraz ma ID
+            document.setArchived(false); // isArchived = false
+            document.setTranslated(false); // isTranslated = false
+            document.setStatus(DocumentStatus.UPLOADED);
 
-            // 2. Używamy ID jako nazwy pliku
-            String fileUrl = azureBlobService.uploadFile(file, document.getId()); // przesyłamy ID jako nazwa
+            // 3️⃣ Zapisz dokument żeby dostać ID
+            document = originalRepo.save(document);
 
-            // 3. Uzupełniamy pole storagePath i ponownie zapisujemy
+            // 4️⃣ Użyj ID jako nazwy pliku i wgraj do blob storage
+            String fileUrl = azureBlobService.uploadFile(file, document.getId()); // np. 60e3ab...pdf
+
+            // 5️⃣ Zapisz ścieżkę do pliku
             document.setStoragePath(fileUrl);
+
+            // 6️⃣ Finalne zapisanie dokumentu z storagePath
             return originalRepo.save(document);
 
         } catch (IOException e) {
@@ -61,23 +72,26 @@ public class DocumentService {
         }
     }
 
-
+    // Pobierz jeden dokument po ID
     public ResponseEntity<OriginalDocument> getOriginalDocument(String id) {
         return originalRepo.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // Pobierz dokument sprawdzając właściciela
     public OriginalDocument getDocumentByIdAndUser(String id, String ownerId) {
         return originalRepo.findById(id)
                 .filter(doc -> doc.getOwnerId().equals(ownerId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nie znaleziono dokumentu lub nie masz dostępu"));
     }
 
+    // Lista dokumentów użytkownika
     public List<OriginalDocument> getDocumentsByUser(String ownerId) {
         return originalRepo.findAllByOwnerId(ownerId);
     }
 
+    // Pobieranie pliku z blob
     public byte[] downloadFromBlob(String blobUrl) {
         String filename = extractFilenameFromUrl(blobUrl);
         return azureBlobService.downloadFile(filename);
@@ -86,5 +100,4 @@ public class DocumentService {
     private String extractFilenameFromUrl(String blobUrl) {
         return blobUrl.substring(blobUrl.lastIndexOf('/') + 1);
     }
-
 }

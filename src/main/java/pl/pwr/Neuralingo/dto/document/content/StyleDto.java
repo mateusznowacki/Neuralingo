@@ -4,5 +4,7 @@ public record StyleDto(
     boolean isHandwritten,
     String similarFontFamily,
     String fontStyle,
-    String fontWeight
+    String fontWeight,
+    SpanDto[] spans
+
 ) {}

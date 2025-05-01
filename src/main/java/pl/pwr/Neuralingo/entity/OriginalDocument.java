@@ -1,11 +1,13 @@
 package pl.pwr.Neuralingo.entity;
 
+import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 @Document(collection = "original_documents")
-public class OriginalDocument extends BaseDocument{
+public class OriginalDocument extends BaseDocument {
 
     private String content;
     private String sourceLanguage;
@@ -13,6 +15,12 @@ public class OriginalDocument extends BaseDocument{
     private String fileType;
     private String storagePath;
 
+    private boolean isTranslated = false; // Domyślnie FALSE
+
+    @DBRef(lazy = true)
+    private List<TranslatedDocument> translations = new ArrayList<>();
+
+    // gettery i settery
 
     public String getContent() {
         return content;
@@ -46,11 +54,28 @@ public class OriginalDocument extends BaseDocument{
         this.fileType = fileType;
     }
 
+    public String getStoragePath() {
+        return storagePath;
+    }
+
     public void setStoragePath(String storagePath) {
         this.storagePath = storagePath;
     }
 
-    public String getStoragePath() {
-        return storagePath;
+    public boolean isTranslated() {
+        return isTranslated;
+    }
+
+    public void setTranslated(boolean translated) {
+        isTranslated = translated;
+    }
+
+    public List<TranslatedDocument> getTranslations() {
+        return translations;
+    }
+
+    public void setTranslations(List<TranslatedDocument> translations) {
+        this.translations = translations;
+        this.isTranslated = (translations != null && !translations.isEmpty());
     }
 }

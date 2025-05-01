@@ -1,41 +1,60 @@
 package pl.pwr.Neuralingo.entity;
 
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Map;
 
 @Document(collection = "translated_documents")
 public class TranslatedDocument {
+
+    @Id
+    private String id;
+
     private String translatedContent;
     private String ownerId;
-
     private String targetLanguage;
 
-    private String originalDocumentId;
+    private String originalDocumentId; // Referencja do OriginalDocument
 
     private Map<String, Object> formatting;
 
     private int wordCount;
-
     private int characterCount;
 
     private String translationProvider; // np. "OpenAI", "Google", "Human"
 
     private boolean reviewed;
-
     private String reviewerComment;
 
     private String fileName;
-
     private String fileType;
 
+    private String storagePath;
+
+    private boolean isArchived = false; // Domyślnie FALSE
+
     public TranslatedDocument() {
-        super();
+        this.reviewed = false;
+        this.isArchived = false;
+        this.translationProvider="Azure Translator";
+    }
+
+    // gettery i settery
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getOwnerId() {
         return ownerId;
     }
+
     public void setOwnerId(String ownerId) {
         this.ownerId = ownerId;
     }
@@ -126,5 +145,21 @@ public class TranslatedDocument {
 
     public void setFileType(String fileType) {
         this.fileType = fileType;
+    }
+
+    public boolean isArchived() {
+        return isArchived;
+    }
+
+    public void setArchived(boolean archived) {
+        isArchived = archived;
+    }
+
+    public String getStoragePath() {
+        return storagePath;
+    }
+
+    public void setStoragePath(String storagePath) {
+        this.storagePath = storagePath;
     }
 }

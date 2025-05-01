@@ -1,7 +1,6 @@
 package pl.pwr.Neuralingo.entity;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.DBRef;
 import pl.pwr.Neuralingo.enums.DocumentStatus;
 
 import java.time.LocalDateTime;
@@ -12,25 +11,22 @@ public abstract class BaseDocument {
     @Id
     private String id;
 
-
     private String ownerId;
-
     private String title;
-
     private String description;
-
     private String documentType;
-
     private DocumentStatus status;
-
     private List<String> tags;
-
     private LocalDateTime createdAt;
+
+    private boolean isArchived = false; // DOMYŚLNIE FALSE
 
     public BaseDocument() {
         this.createdAt = LocalDateTime.now();
         this.status = DocumentStatus.PENDING;
     }
+
+    // gettery i settery
 
     public String getId() {
         return id;
@@ -94,5 +90,13 @@ public abstract class BaseDocument {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public boolean isArchived() {
+        return isArchived;
+    }
+
+    public void setArchived(boolean archived) {
+        isArchived = archived;
     }
 }

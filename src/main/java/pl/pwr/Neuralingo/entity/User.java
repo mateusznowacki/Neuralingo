@@ -2,7 +2,7 @@ package pl.pwr.Neuralingo.entity;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import pl.pwr.Neuralingo.enums.ROLE;
+import pl.pwr.Neuralingo.enums.Role;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,7 +19,7 @@ public class User {
     private String firstName;
     private String lastName;
 
-    private ROLE role;
+    private Role role;
     private boolean active;
     private String profileImageUrl;
     private LocalDateTime createdAt;
@@ -81,11 +81,11 @@ public class User {
         this.lastName = lastName;
     }
 
-    public ROLE getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public void setRole(ROLE role) {
+    public void setRole(Role role) {
         this.role = role;
     }
 
