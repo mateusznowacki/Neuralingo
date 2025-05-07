@@ -1,5 +1,6 @@
 package pl.pwr.Neuralingo.utils;
 
+import pl.pwr.Neuralingo.dto.document.DocumentEntityDto;
 import pl.pwr.Neuralingo.dto.document.content.*;
 
 import pl.pwr.Neuralingo.dto.document.content.*;
@@ -24,7 +25,9 @@ public class AzureContentExtractor {
                 tables != null ? tables : new TableDto[0],
                 listItems != null ? listItems : new ListItemDto[0],
                 keyValuePairs != null ? keyValuePairs : new KeyValuePairDto[0],
-                figures != null ? figures : new FigureDto[0]
+                figures != null ? figures : new FigureDto[0],
+                dto.entities() != null ? dto.entities() : new DocumentEntityDto[0],
+                dto.relationships() != null ? dto.relationships() : new DocumentEntityRelationDto[0]
         );
     }
 

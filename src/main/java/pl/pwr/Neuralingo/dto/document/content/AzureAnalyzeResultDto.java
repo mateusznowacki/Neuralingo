@@ -1,5 +1,7 @@
 package pl.pwr.Neuralingo.dto.document.content;
 
+import pl.pwr.Neuralingo.dto.document.DocumentEntityDto;
+
 public record AzureAnalyzeResultDto(
     String apiVersion,
     String modelId,
@@ -13,5 +15,7 @@ public record AzureAnalyzeResultDto(
     LanguageDto[] languages,
     FigureDto[] figures,
     ListItemDto[] listItems,
-    DocumentFieldDto[] documents
+    DocumentFieldDto[] documents,
+    DocumentEntityDto[] entities,
+    DocumentEntityRelationDto[] relationships
 ) {}
