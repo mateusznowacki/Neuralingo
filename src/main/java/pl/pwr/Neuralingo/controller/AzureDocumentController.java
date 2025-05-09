@@ -51,7 +51,7 @@ public class AzureDocumentController {
         logger.info("Pobrano plik ze ścieżki: {}", doc.getStoragePath());
 
         // 3️⃣ Wysłanie do Azure Document Intelligence i zmapowanie wyniku
-        ExtractedDocumentContentDto result = azureDocumentIntelligenceService.analyzeDocument(fileBytes, doc.getFileType());
+       ExtractedDocumentContentDto result = azureDocumentIntelligenceService.analyzeDocument(fileBytes, doc.getFileType());
 
         logger.info("Zakończono ekstrakcję. Wykryto paragrafów: {}",
                     result.paragraphs() != null ? result.paragraphs().length : 0);

@@ -1,4 +1,6 @@
 package pl.pwr.Neuralingo.document.content;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-public record UploadMetadata(String title) {}
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record UploadMetadata(String title, String sourceLanguage) {}
