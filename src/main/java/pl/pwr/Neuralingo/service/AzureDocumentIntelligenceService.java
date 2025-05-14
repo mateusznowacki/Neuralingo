@@ -30,8 +30,8 @@ public class AzureDocumentIntelligenceService {
     @Value("${azure.document.apiKey}")
     private String apiKey;
 
-    private static final String MODEL = "prebuilt-read";
-    private static final String API_VERSION = "2024-11-30";
+private static final String MODEL = "prebuilt-document";
+    private static final String API_VERSION = "2023-07-31";
 
     private final ObjectMapper objectMapper;
     private static final Logger logger = LoggerFactory.getLogger(AzureDocumentIntelligenceService.class);
@@ -50,15 +50,15 @@ public class AzureDocumentIntelligenceService {
 
     public ExtractedDocumentContentDto analyzeDocument(byte[] fileBytes, String fileType) {
         try {
-            HttpRequest submit = HttpRequest.newBuilder()
-                .uri(URI.create(endpoint + "/documentintelligence/documentModels/" + MODEL
-                        + ":analyze?api-version=" + API_VERSION
-                        + "&stringIndexType=textElements"))
-                .header("Content-Type", fileType)
-                .header("Ocp-Apim-Subscription-Key", apiKey)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(fileBytes))
-                .build();
-
+              HttpRequest submit = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint + "/formrecognizer/documentModels/" + MODEL + ":analyze?api-version=" + API_VERSION))
+                    .header("Content-Type", fileType)
+                    .header("Ocp-Apim-Subscription-Key", apiKey)
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(fileBytes))
+                    .build();
+            HttpResponse<Void> subResp = client.send(submit, HttpResponse.BodyHandlers.discarding());
+            String opLocation = subResp.headers().firstValue("operation-location")
+                    .orElseThrow(() -> new RuntimeException("Brak operation-location"));
             logger.info("Wysyłanie dokumentu do Azure...");
 
             HttpResponse<String> submitResponse = client.send(submit, HttpResponse.BodyHandlers.ofString());
