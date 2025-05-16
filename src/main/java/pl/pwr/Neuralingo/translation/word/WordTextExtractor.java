@@ -2,8 +2,7 @@ package pl.pwr.Neuralingo.translation.word;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.json.JSONArray;
-import org.json.JSONObject;
+
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 

@@ -9,11 +9,7 @@ import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
 
 import java.io.*;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+
 
 @Component
 public class WordTranslationFacade {
