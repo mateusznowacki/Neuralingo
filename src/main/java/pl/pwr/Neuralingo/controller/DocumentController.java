@@ -32,7 +32,7 @@ public class DocumentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<DocumentDTO> uploadDocument(
             @RequestParam("file") MultipartFile file,
-            Authentication authentication) throws JsonProcessingException {
+            Authentication authentication) {
         return documentService.uploadDocument(file, authentication);
     }
 

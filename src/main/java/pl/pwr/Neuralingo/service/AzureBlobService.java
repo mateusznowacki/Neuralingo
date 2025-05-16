@@ -59,7 +59,7 @@ public class AzureBlobService {
             throw new RuntimeException("Plik nie istnieje w blob storage: " + blobName);
         }
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            blobClient.download(outputStream);
+            blobClient.downloadStream(outputStream);
             return outputStream.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException("Błąd podczas pobierania pliku: " + blobName, e);
@@ -84,7 +84,7 @@ public class AzureBlobService {
             }
 
             try (FileOutputStream fos = new FileOutputStream(localFile)) {
-                blobClient.download(fos);
+                blobClient.downloadStream(fos);
             }
 
             return localFile.getAbsolutePath();
