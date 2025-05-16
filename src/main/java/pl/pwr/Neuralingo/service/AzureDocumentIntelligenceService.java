@@ -1,5 +1,13 @@
 package pl.pwr.Neuralingo.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -9,17 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import pl.pwr.Neuralingo.dto.document.DocumentEntityDto;
-import pl.pwr.Neuralingo.dto.document.content.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class AzureDocumentIntelligenceService {
@@ -30,72 +28,74 @@ public class AzureDocumentIntelligenceService {
     @Value("${azure.document.apiKey}")
     private String apiKey;
 
-private static final String MODEL = "prebuilt-document";
-    private static final String API_VERSION = "2023-07-31";
+    private static final String READ_MODEL = "prebuilt-read";
+    private static final String READ_API_VERSION = "2024-11-30";
 
-    private final ObjectMapper objectMapper;
+    private static final String LAYOUT_MODEL = "prebuilt-layout";
+    private static final String LAYOUT_API_VERSION = "2024-11-30";
+
     private static final Logger logger = LoggerFactory.getLogger(AzureDocumentIntelligenceService.class);
 
     private HttpClient client;
-
-    @Autowired
-    public AzureDocumentIntelligenceService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     @PostConstruct
     private void init() {
         client = HttpClient.newHttpClient();
     }
 
-    public ExtractedDocumentContentDto analyzeDocument(byte[] fileBytes, String fileType) {
+    public void analyzeAndSaveOnly(byte[] fileBytes, String fileType) {
         try {
-              HttpRequest submit = HttpRequest.newBuilder()
-                    .uri(URI.create(endpoint + "/formrecognizer/documentModels/" + MODEL + ":analyze?api-version=" + API_VERSION))
-                    .header("Content-Type", fileType)
-                    .header("Ocp-Apim-Subscription-Key", apiKey)
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(fileBytes))
-                    .build();
-            HttpResponse<Void> subResp = client.send(submit, HttpResponse.BodyHandlers.discarding());
-            String opLocation = subResp.headers().firstValue("operation-location")
-                    .orElseThrow(() -> new RuntimeException("Brak operation-location"));
-            logger.info("Wysyłanie dokumentu do Azure...");
+            CompletableFuture<JSONObject> readFuture = sendToModel(READ_MODEL, READ_API_VERSION, fileBytes, fileType, "read");
+            CompletableFuture<JSONObject> layoutFuture = sendToModel(LAYOUT_MODEL, LAYOUT_API_VERSION, fileBytes, fileType, "layout");
 
-            HttpResponse<String> submitResponse = client.send(submit, HttpResponse.BodyHandlers.ofString());
+            readFuture.get();
+            layoutFuture.get();
 
-            logger.info("Kod odpowiedzi submit: {}", submitResponse.statusCode());
-            submitResponse.headers().map().forEach((k, v) -> logger.info("Header: {} = {}", k, v));
-            logger.info("Body odpowiedzi submit: {}", submitResponse.body());
-
-            if (submitResponse.statusCode() >= 400) {
-                throw new RuntimeException("Azure zwrócił błąd HTTP " + submitResponse.statusCode() + ": " + submitResponse.body());
-            }
-
-            String operationLocation = submitResponse.headers()
-                    .firstValue("operation-location")
-                    .orElseThrow(() -> new RuntimeException("Brak operation-location w odpowiedzi Azure."));
-
-            JSONObject root = pollForResult(client, operationLocation);
-
-            logger.info("SUROWY JSON OD AZURE:");
-            logger.info(root.toString(2));
-
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-            String filename = "response_read_" + timestamp + ".json";
-            Path outputPath = Path.of("responses", filename);
-
-            Files.createDirectories(outputPath.getParent());
-            Files.writeString(outputPath, root.toString(2), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            logger.info("Zapisano odpowiedź JSON do pliku: {}", outputPath);
-
-            return new ExtractedDocumentContentDto(null, null, null, null, null, null, null);
+            logger.info("Oba modele zakończyły analizę i zapisano wyniki do plików.");
         } catch (Exception e) {
-            logger.error("Błąd podczas przetwarzania dokumentu przez Azure: {}", e.getMessage(), e);
-            throw new RuntimeException("Błąd podczas przetwarzania dokumentu przez Azure: " + e.getMessage(), e);
+            logger.error("Błąd podczas równoległej analizy dokumentu: {}", e.getMessage(), e);
+            throw new RuntimeException("Błąd podczas przetwarzania dokumentu: " + e.getMessage(), e);
         }
     }
 
-    private JSONObject pollForResult(HttpClient client, String url) throws Exception {
+    private CompletableFuture<JSONObject> sendToModel(String model, String version, byte[] bytes, String fileType, String suffix) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                HttpRequest submit = HttpRequest.newBuilder()
+                        .uri(URI.create(endpoint + "/documentintelligence/documentModels/" + model + ":analyze?api-version=" + version + "&stringIndexType=textElements"))
+                        .header("Content-Type", fileType)
+                        .header("Ocp-Apim-Subscription-Key", apiKey)
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
+                        .build();
+
+                HttpResponse<String> submitResponse = client.send(submit, HttpResponse.BodyHandlers.ofString());
+
+                if (submitResponse.statusCode() >= 400) {
+                    throw new RuntimeException("Błąd " + submitResponse.statusCode() + " od modelu " + model + ": " + submitResponse.body());
+                }
+
+                String opLoc = submitResponse.headers()
+                        .firstValue("operation-location")
+                        .orElseThrow(() -> new RuntimeException("Brak operation-location dla modelu " + model));
+
+                JSONObject root = pollForResult(opLoc);
+
+                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+                String filename = "response_" + suffix + "_" + timestamp + ".json";
+                Path outputPath = Path.of("responses", filename);
+                Files.createDirectories(outputPath.getParent());
+                Files.writeString(outputPath, root.toString(2), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+                logger.info("Zapisano JSON dla modelu {} do pliku: {}", model, outputPath);
+                return root;
+
+            } catch (Exception e) {
+                throw new RuntimeException("Błąd przy obsłudze modelu " + model + ": " + e.getMessage(), e);
+            }
+        });
+    }
+
+    private JSONObject pollForResult(String url) throws Exception {
         for (int i = 0; i < 20; i++) {
             HttpRequest pollRequest = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -103,25 +103,22 @@ private static final String MODEL = "prebuilt-document";
                     .GET()
                     .build();
 
-            HttpResponse<String> pollResponse = client.send(pollRequest, HttpResponse.BodyHandlers.ofString());
-
-            logger.info("Poll response [{}]: {}", i + 1, pollResponse.statusCode());
-            JSONObject result = new JSONObject(pollResponse.body());
+            HttpResponse<String> response = client.send(pollRequest, HttpResponse.BodyHandlers.ofString());
+            JSONObject result = new JSONObject(response.body());
 
             String status = result.optString("status");
-            logger.info("Status analizy: {}", status);
+            logger.info("Status z modelu: {}", status);
 
             switch (status) {
                 case "succeeded" -> {
                     return result;
                 }
-                case "failed" ->
-                        throw new RuntimeException("Azure zwrócił status 'failed'. Szczegóły: " + result.toString(2));
+                case "failed" -> throw new RuntimeException("Status 'failed': " + result.toString(2));
             }
 
             Thread.sleep(1500);
         }
 
-        throw new RuntimeException("Przekroczono czas oczekiwania na wynik od Azure.");
+        throw new RuntimeException("Przekroczono czas oczekiwania na wynik modelu");
     }
 }

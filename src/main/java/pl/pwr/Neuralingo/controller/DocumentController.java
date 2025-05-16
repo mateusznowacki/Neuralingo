@@ -1,7 +1,7 @@
+// === DocumentController.java ===
 package pl.pwr.Neuralingo.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import pl.pwr.Neuralingo.entity.OriginalDocument;
 import pl.pwr.Neuralingo.service.DocumentService;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -35,25 +36,33 @@ public class DocumentController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @GetMapping("/{id}")
-    public ResponseEntity<byte[]> getOriginalDocument(@PathVariable String id, Authentication authentication) {
-        OriginalDocument doc = documentService.getDocumentByIdAndUser(id, authentication.getName());
-
-        byte[] fileContent = documentService.downloadFromBlob(doc.getStoragePath());
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + doc.getTitle() + "\"")
-                .contentType(MediaType.parseMediaType(doc.getFileType()))
-                .body(fileContent);
-    }
-
-    @PreAuthorize("isAuthenticated()")
     @GetMapping("/user")
     public ResponseEntity<List<OriginalDocument>> getUserDocuments(Authentication authentication) {
         return ResponseEntity.ok(documentService.getDocumentsByUser(authentication.getName()));
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/download/{id}")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable String id, Authentication authentication) {
+        return documentService.downloadAndSaveLocally(id, authentication.getName());
+    }
 
-
-
+//    @PreAuthorize("isAuthenticated()")
+//    @GetMapping("/{id}")
+//    public ResponseEntity<byte[]> getOriginalDocument(@PathVariable String id, Authentication authentication) {
+//        OriginalDocument doc = documentService.getDocumentByIdAndUser(id, authentication.getName());
+//        byte[] fileContent = documentService.downloadFromBlob(doc.getStoragePath());
+//
+//        return ResponseEntity.ok()
+//                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + doc.getTitle() + "\"")
+//                .contentType(MediaType.parseMediaType(doc.getFileType()))
+//                .body(fileContent);
+//    }
+//
+//    @PreAuthorize("isAuthenticated()")
+//    @PostMapping("/translate/{id}")
+//    public ResponseEntity<String> translateDocument(@PathVariable String id, Authentication authentication) throws IOException {
+//        String result = documentService.translateWord(id, authentication.getName());
+//        return ResponseEntity.ok(result);
+//    }
 }
