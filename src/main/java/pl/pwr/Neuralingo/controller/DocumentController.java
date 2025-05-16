@@ -68,8 +68,9 @@ public class DocumentController {
 
         DocumentEntity doc = docOpt.get();
         byte[] content = azureBlobService.downloadFile(doc.getId());
-
-        String extension = getExtensionFromMime(doc.getFileType());
+        if (content == null) {
+            return ResponseEntity.status(404).build();
+        }
         String filename = doc.getOriginalFilename();
 
         return ResponseEntity.ok()
@@ -77,35 +78,6 @@ public class DocumentController {
                 .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
                 .body(content);
     }
-
-
-  private String getExtensionFromMime(String mime) {
-    return switch (mime) {
-        case "application/pdf" -> "pdf";
-
-        // Word
-        case "application/msword" -> "doc";
-        case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
-
-        // Excel
-        case "application/vnd.ms-excel" -> "xls";
-        case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx";
-
-        // PowerPoint
-        case "application/vnd.ms-powerpoint" -> "ppt";
-        case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx";
-
-        // Visio
-        case "application/vnd.visio" -> "vsd";
-        case "application/vnd.ms-visio.drawing.main+xml" -> "vsdx";
-
-        // TXT
-        case "text/plain" -> "txt";
-
-        default -> "bin";
-    };
-}
-
 }
 
 
