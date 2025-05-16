@@ -15,18 +15,18 @@ public class DocumentEntity {
 
     @Id
     private String id;
+    private String ownerId;
 
     private String fileType;
     private String originalFilename;
     private String originalStoragePath;
-    private String translatedFilename;
-    private String translatedFileType;
-    private String translatedStoragePath;
-
-
     private String sourceLanguage;
-    private String targetLanguage;
 
-    private String ownerId;
+    @Builder.Default
+    private String translatedFilename = "null";
+    @Builder.Default
+    private String translatedStoragePath = "null";
+    @Builder.Default
+    private String targetLanguage = "null";
 
 }

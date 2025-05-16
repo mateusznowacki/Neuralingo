@@ -10,7 +10,7 @@ import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.entity.DocumentEntity;
 import pl.pwr.Neuralingo.service.AzureBlobService;
 import pl.pwr.Neuralingo.service.DocumentService;
-import pl.pwr.Neuralingo.translation.word.WordTranslationFacade;
+import pl.pwr.Neuralingo.translation.word.DocumentTranslationFacade;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,13 +23,13 @@ import java.util.Optional;
 @RequestMapping("/api/translate")
 public class TranslatorController {
 
-    private final WordTranslationFacade wordTranslator;
+    private final DocumentTranslationFacade wordTranslator;
     // private final OcrTranslationFacade ocrTranslator;
     private final AzureBlobService azureBlobService;
     private final DocumentService documentService;
 
     @Autowired
-    public TranslatorController(WordTranslationFacade wordTranslator,
+    public TranslatorController(DocumentTranslationFacade wordTranslator,
                                 //  OcrTranslationFacade ocrTranslator,
                                 AzureBlobService azureBlobService,
                                 DocumentService documentService) {

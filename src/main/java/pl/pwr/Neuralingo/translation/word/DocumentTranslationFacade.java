@@ -1,24 +1,23 @@
 package pl.pwr.Neuralingo.translation.word;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 
 
 @Component
-public class WordTranslationFacade {
+public class DocumentTranslationFacade {
 
     private final WordTextExtractor wordTextExtractor;
     private final WordTextReplacer wordTextReplacer;
     private final AzureDocumentTranslationService azure;
 
-    public WordTranslationFacade(WordTextExtractor wordTextExtractor, WordTextReplacer wordTextReplacer, AzureDocumentTranslationService azureDocumentTranslationService) {
+    public DocumentTranslationFacade(WordTextExtractor wordTextExtractor, WordTextReplacer wordTextReplacer, AzureDocumentTranslationService azureDocumentTranslationService) {
         this.wordTextExtractor = wordTextExtractor;
         this.wordTextReplacer = wordTextReplacer;
         this.azure = azureDocumentTranslationService;
