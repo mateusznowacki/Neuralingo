@@ -1,104 +1,82 @@
 package pl.pwr.Neuralingo.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
-
-import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
 @Service
 public class AzureDocumentTranslationService {
 
-//    @Value("${azure.translator.endpoint}")
-//    private String translatorEndpoint;
-//
-//    @Value("${azure.translator.apiKey}")
-//    private String translatorApiKey;
-//
-//    @Value("${azure.translator.region}")
-//    private String translatorRegion;
-//
-//    private final WebClient webClient;
-//
-//    public AzureDocumentTranslationService(WebClient.Builder webClientBuilder) {
-//        this.webClient = webClientBuilder.build();
-//    }
-//
-//    public ExtractedDocumentContentDto translate(ExtractedDocumentContentDto content, String targetLang) {
-//        // 1. Zbuduj HTML z ExtractedDocumentContent
-//        String html = buildHtml(content);
-//
-//        // 2. Wyślij do Azure Translatora
-//        String translatedHtml = translateHtml(html, targetLang);
-//
-//        // 3. Utwórz nowy ExtractedDocumentContent ze zaktualizowanym tekstem
-//        ExtractedDocumentContent translatedContent = new ExtractedDocumentContent(
-//                translatedHtml,                  // text
-//                content.language(),              // language
-//                content.paragraphs(),            // paragraphs
-//                content.tables(),                // tables
-//                content.styles(),                // styles
-//                content.sections(),              // sections
-//                content.keyValuePairs(),         // keyValuePairs
-//                content.entities(),              // entities
-//                content.lines(),                 // lines
-//                content.words()                  // words
-//        );
-//
-//        return translatedContent;
-//    }
-//
-//    private String buildHtml(ExtractedDocumentContent content) {
-//        StringBuilder html = new StringBuilder();
-//
-//        // Dodaj paragrafy
-//        List<?> paragraphs = content.paragraphs();
-//        if (paragraphs != null) {
-//            for (Object para : paragraphs) {
-//                html.append("<p>").append(para.toString()).append("</p>");
-//            }
-//        }
-//
-//if (content.tables() != null) {
-//    html.append("<table border='1'>");
-//    for (Table table : content.tables()) {
-//        for (List<String> row : table.cells()) {   // Każdy wiersz
-//            html.append("<tr>");
-//            for (String cellContent : row) {       // Każda komórka w wierszu
-//                html.append("<td>").append(cellContent).append("</td>");
-//            }
-//            html.append("</tr>");
-//        }
-//    }
-//    html.append("</table>");
-//}
-//
-//
-//        return html.toString();
-//    }
-//
-//    private String translateHtml(String html, String targetLang) {
-//        String url = translatorEndpoint + "/translate?api-version=3.0&to=" + targetLang;
-//
-//        // Body w JSON
-//        String body = "[{\"Text\":\"" + html.replace("\"", "\\\"") + "\"}]";
-//
-//        String response = webClient.post()
-//                .uri(url)
-//                .header("Ocp-Apim-Subscription-Key", translatorApiKey)
-//                .header("Ocp-Apim-Subscription-Region", translatorRegion)
-//                .header(HttpHeaders.CONTENT_TYPE, "application/json")
-//                .bodyValue(body)
-//                .retrieve()
-//                .bodyToMono(String.class)
-//                .block();
-//
-//        // Uproszczone parsowanie — dla produkcji polecam Jackson/JsonPath
-//        String translatedText = response.split("\"text\":\"")[1].split("\"")[0];
-//
-//        return translatedText;
-//    }
+    @Value("${azure.translator.endpoint}")
+    private String translatorEndpoint;
+
+    @Value("${azure.translator.apiKey}")
+    private String translatorApiKey;
+
+    @Value("${azure.translator.region}")
+    private String translatorRegion;
+
+    public TranslatedText translate(ExtractedText extractedText, String targetLanguage) {
+        List<TranslatedText.Paragraph> translatedParagraphs = new ArrayList<>();
+
+        for (ExtractedText.Paragraph para : extractedText.paragraphs) {
+            String translated = translateSingleText(para.text, targetLanguage);
+            translatedParagraphs.add(new TranslatedText.Paragraph(para.index, translated));
+        }
+
+        return new TranslatedText(translatedParagraphs);
+    }
+
+    private String translateSingleText(String text, String targetLanguage) {
+        try {
+            URL url = new URL(translatorEndpoint + "/translate?api-version=3.0&to=" + targetLanguage);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Ocp-Apim-Subscription-Key", translatorApiKey);
+            connection.setRequestProperty("Ocp-Apim-Subscription-Region", translatorRegion);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setDoOutput(true);
+
+            JSONArray requestBody = new JSONArray();
+            JSONObject textObj = new JSONObject();
+            textObj.put("Text", text);
+            requestBody.put(textObj);
+
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = requestBody.toString().getBytes("UTF-8");
+                os.write(input, 0, input.length);
+            }
+
+            StringBuilder response = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), "UTF-8"))) {
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+            }
+
+            JSONArray jsonArray = new JSONArray(response.toString());
+            return jsonArray.getJSONObject(0)
+                            .getJSONArray("translations")
+                            .getJSONObject(0)
+                            .getString("text");
+
+        } catch (Exception e) {
+            throw new RuntimeException("Błąd podczas tłumaczenia tekstu przez Azure Translator", e);
+        }
+    }
 }

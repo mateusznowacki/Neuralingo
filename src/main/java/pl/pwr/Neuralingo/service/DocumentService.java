@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import pl.pwr.Neuralingo.document.content.UploadMetadata;
-import pl.pwr.Neuralingo.entity.OriginalDocument;
 import pl.pwr.Neuralingo.enums.DocumentStatus;
 import pl.pwr.Neuralingo.repository.OriginalDocumentRepository;
 import pl.pwr.Neuralingo.utils.LocalSaver;

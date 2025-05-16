@@ -1,7 +1,12 @@
 package pl.pwr.Neuralingo.translation.word;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.stereotype.Component;
+import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
+import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
 
 import java.io.*;
 import java.net.URL;
@@ -10,57 +15,47 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
+@Component
 public class WordTranslationFacade {
 
-    public static void translateWord(String url) throws IOException {
-        // 1. Pobierz plik z Azure Blob
-        String localDocxPath = "downloaded.docx";
-        try (InputStream in = new URL(url).openStream()) {
-            Files.copy(in, Paths.get(localDocxPath));
-        }
+    private final WordTextExtractor wordTextExtractor;
+    private final WordTextReplacer wordTextReplacer;
+    private final AzureDocumentTranslationService azure;
 
-        // 2. Wyciągnij tekst
-        JSONObject extractedJson = WordTextExtractor.extractParagraphTexts(localDocxPath);
-        ExtractedText extractedText = parseExtractedText(extractedJson);
-
-        // 3. Wykonaj tłumaczenie (tu placeholder — kopiujemy tekst z prefixem "[EN]")
-        List<TranslatedText.Paragraph> translatedList = new ArrayList<>();
-        for (ExtractedText.Paragraph para : extractedText.paragraphs) {
-            translatedList.add(new TranslatedText.Paragraph(para.index, "[EN] " + para.text));
-        }
-        TranslatedText translated = new TranslatedText(translatedList);
-
-        // 4. Zapisz tymczasowy plik JSON z tłumaczeniem
-        JSONObject translatedJson = new JSONObject();
-        JSONArray array = new JSONArray();
-        for (TranslatedText.Paragraph para : translated.paragraphs) {
-            JSONObject p = new JSONObject();
-            p.put("index", para.index);
-            p.put("text", para.text);
-            array.put(p);
-        }
-        translatedJson.put("paragraphs", array);
-        String translatedJsonPath = "translated.json";
-        try (FileWriter writer = new FileWriter(translatedJsonPath)) {
-            writer.write(translatedJson.toString(2));
-        }
-
-        // 5. Podmień teksty i zapisz nowy dokument
-        String translatedDocxPath = "translated_output.docx";
-        WordTextReplacer.replaceParagraphs(localDocxPath, translatedJsonPath, translatedDocxPath);
-
-        System.out.println("✅ Zakończono tłumaczenie dokumentu. Wynik zapisano jako: " + translatedDocxPath);
+    public WordTranslationFacade(WordTextExtractor wordTextExtractor, WordTextReplacer wordTextReplacer, AzureDocumentTranslationService azureDocumentTranslationService) {
+        this.wordTextExtractor = wordTextExtractor;
+        this.wordTextReplacer = wordTextReplacer;
+        this.azure = azureDocumentTranslationService;
     }
 
-    private static ExtractedText parseExtractedText(JSONObject json) {
-        List<ExtractedText.Paragraph> result = new ArrayList<>();
-        JSONArray paragraphs = json.getJSONArray("paragraphs");
-        for (int i = 0; i < paragraphs.length(); i++) {
-            JSONObject para = paragraphs.getJSONObject(i);
-            int index = para.getInt("index");
-            String text = para.getString("text");
-            result.add(new ExtractedText.Paragraph(index, text));
+    public String translateDocument(File inputFile, String targetLanguage) throws IOException {
+        ExtractedText extractedText = wordTextExtractor.extractText(inputFile);
+
+        TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
+
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            String directoryPath = "resources/temp";
+            java.nio.file.Files.createDirectories(java.nio.file.Paths.get(directoryPath));
+
+            String outputPath = directoryPath + "/"  + "_translated.json";
+            mapper.writerWithDefaultPrettyPrinter().writeValue(new File(outputPath), translatedText);
+
+            System.out.println("Zapisano przetłumaczony tekst pod: " + outputPath);
+        } catch (IOException e) {
+            throw new RuntimeException("Błąd zapisu pliku JSON", e);
         }
-        return new ExtractedText(result);
+
+        // Dodaj końcówkę "_translated.docx" do oryginalnej nazwy
+        String originalPath = inputFile.getAbsolutePath();
+        String outputPath = originalPath.replace(".docx", "") + "_translated.docx";
+
+        File outputFile = new File(outputPath);
+
+        wordTextReplacer.replaceParagraphs(inputFile, extractedText, translatedText);
+
+        return outputFile.getAbsolutePath();
     }
+
 }
