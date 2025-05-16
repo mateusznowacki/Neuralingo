@@ -16,7 +16,7 @@ public record DocumentDTO(
     public static DocumentDTO from(DocumentEntity doc) {
         return new DocumentDTO(
                 doc.getId(),
-                doc.getUserId(),
+                doc.getOwnerId(),
                 doc.getOriginalFilename(),
                 doc.getFileType(),
                 doc.getOriginalStoragePath(),

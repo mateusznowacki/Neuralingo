@@ -9,5 +9,6 @@ import java.util.List;
 public interface DocumentRepository extends MongoRepository<DocumentEntity, String> {
 
     // Pobierz wszystkie dokumenty danego użytkownika po jego ID
-    List<DocumentEntity> findByUserId(String userId);
+    List<DocumentEntity> findByOwnerId(String userId);
 }
+

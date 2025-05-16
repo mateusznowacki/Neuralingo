@@ -42,6 +42,16 @@ public class AzureBlobService {
         }
     }
 
+    public String uploadFile(File file, String blobName) {
+        try (InputStream inputStream = new FileInputStream(file)) {
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+            blobClient.upload(inputStream, file.length(), true);
+            return blobClient.getBlobUrl();
+        } catch (IOException e) {
+            throw new RuntimeException("Nie udało się przesłać pliku do Azure Blob", e);
+        }
+    }
+
     // Pobranie pliku jako bajty (np. do odpowiedzi API)
     public byte[] downloadFile(String blobName) {
         BlobClient blobClient = containerClient.getBlobClient(blobName);

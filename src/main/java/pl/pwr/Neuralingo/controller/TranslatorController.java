@@ -3,52 +3,119 @@ package pl.pwr.Neuralingo.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import pl.pwr.Neuralingo.dto.DocumentDTO;
+import pl.pwr.Neuralingo.entity.DocumentEntity;
 import pl.pwr.Neuralingo.service.AzureBlobService;
+import pl.pwr.Neuralingo.service.DocumentService;
 import pl.pwr.Neuralingo.translation.word.WordTranslationFacade;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/translate")
 public class TranslatorController {
 
-
-    private final WordTranslationFacade word;
+    private final WordTranslationFacade wordTranslator;
+    // private final OcrTranslationFacade ocrTranslator;
     private final AzureBlobService azureBlobService;
+    private final DocumentService documentService;
 
     @Autowired
-    public TranslatorController(WordTranslationFacade word, AzureBlobService azureBlobService) {
+    public TranslatorController(WordTranslationFacade wordTranslator,
+                                //  OcrTranslationFacade ocrTranslator,
+                                AzureBlobService azureBlobService,
+                                DocumentService documentService) {
+        this.wordTranslator = wordTranslator;
+        //  this.ocrTranslator = ocrTranslator;
         this.azureBlobService = azureBlobService;
-        this.word = word;
+        this.documentService = documentService;
+    }
+
+    @PostMapping("/document/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<DocumentDTO> translateDocumentById(@PathVariable String id,
+                                                             @RequestParam String targetLanguage,
+                                                             Authentication auth) {
+        Optional<DocumentEntity> docOpt = documentService.getEntityById(id, auth);
+        if (docOpt.isEmpty()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        try {
+            DocumentEntity doc = docOpt.get();
+            String extension = getExtensionFromMime(doc.getFileType());
+
+            // 1. Download blob to temp directory without extension, then rename
+            String rawPath = azureBlobService.downloadLocal(id);
+            Path originalPath = Path.of(rawPath);
+            Path renamedPath = Path.of(rawPath + "." + extension);
+            Files.move(originalPath, renamedPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // 2. Translate document
+            File inputFile = renamedPath.toFile();
+            String translatedPath = wordTranslator.translateDocument(inputFile, targetLanguage);
+
+            // 3. Upload translated file back without extension
+            File translatedFile = new File(translatedPath);
+            String translatedBlobName = id + "_translated";
+            String translatedBlobUrl = azureBlobService.uploadFile(translatedFile, translatedBlobName);
+
+            // 4. Update document metadata
+            doc.setTargetLanguage(targetLanguage);
+            doc.setTranslatedFilename(translatedFile.getName());
+            doc.setTranslatedStoragePath(translatedBlobUrl);
+            documentService.updateDocument(doc);
+
+            return ResponseEntity.ok(DocumentDTO.from(doc));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
 
+//    @PostMapping("/ocr/{id}")
+//    @PreAuthorize("isAuthenticated()")
+//    public ResponseEntity<DocumentDTO> translateOcrById(@PathVariable String id,
+//                                                        @RequestParam String targetLanguage,
+//                                                        Authentication auth) {
+//        Optional<DocumentEntity> docOpt = documentService.getEntityById(id, auth);
+//        if (docOpt.isEmpty()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+//
+//        try {
+//            File inputFile = new File(azureBlobService.downloadLocal(id));
+//            String translatedPath = ocrTranslator.translateDocument(inputFile, targetLanguage);
+//
+//            DocumentEntity doc = docOpt.get();
+//            doc.setTargetLanguage(targetLanguage);
+//            doc.setTranslatedStoragePath(translatedPath);
+//            documentService.updateDocument(doc);
+//
+//            return ResponseEntity.ok(DocumentDTO.from(doc));
+//        } catch (IOException e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                    .build();
+//        }
+//    }
 
-
-
-
-
-
-
-
-
-@GetMapping("/word")
-public ResponseEntity<String> translateWord() {
-    try {
-        String localPath = azureBlobService.downloadLocal("6826a42ad621af7672f6ecc6");
-        File inputFile = new File(localPath);
-        String translatedPath = word.translateDocument(inputFile, "en");
-        return ResponseEntity.ok("Przetłumaczony plik zapisano pod: " + translatedPath);
-    } catch (Exception e) {
-        e.printStackTrace(); // albo logger.error
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Błąd podczas tłumaczenia: " + e.getMessage());
+    private String getExtensionFromMime(String mime) {
+        return switch (mime) {
+            case "application/pdf" -> "pdf";
+            case "application/msword" -> "doc";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
+            case "application/vnd.ms-excel" -> "xls";
+            case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx";
+            case "application/vnd.ms-powerpoint" -> "ppt";
+            case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx";
+            case "application/vnd.visio" -> "vsd";
+            case "application/vnd.ms-visio.drawing.main+xml" -> "vsdx";
+            case "text/plain" -> "txt";
+            default -> "bin";
+        };
     }
-}
-
 }

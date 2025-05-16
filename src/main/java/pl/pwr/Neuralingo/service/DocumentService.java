@@ -42,7 +42,7 @@ public class DocumentService {
                     .originalFilename(file.getOriginalFilename())
                     .fileType(file.getContentType())
                     .sourceLanguage(user.getNativeLanguage())
-                    .userId(user.getId())
+                    .ownerId(user.getId())
                     .build();
 
             documentRepository.save(doc);
@@ -61,14 +61,14 @@ public class DocumentService {
 
     public ResponseEntity<List<DocumentDTO>> getAllUserDocuments(Authentication auth) {
         String userId = auth.getName();
-        List<DocumentEntity> docs = documentRepository.findByUserId(userId);
+        List<DocumentEntity> docs = documentRepository.findByOwnerId(userId);
         List<DocumentDTO> result = docs.stream().map(DocumentDTO::from).collect(Collectors.toList());
         return ResponseEntity.ok(result);
     }
 
     public ResponseEntity<DocumentDTO> getDocumentById(String id, Authentication auth) {
         Optional<DocumentEntity> docOpt = documentRepository.findById(id);
-        if (docOpt.isEmpty() || !docOpt.get().getUserId().equals(auth.getName())) {
+        if (docOpt.isEmpty() || !docOpt.get().getOwnerId().equals(auth.getName())) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(DocumentDTO.from(docOpt.get()));
@@ -76,7 +76,7 @@ public class DocumentService {
 
     public ResponseEntity<Void> deleteDocumentById(String id, Authentication auth) {
         Optional<DocumentEntity> docOpt = documentRepository.findById(id);
-        if (docOpt.isEmpty() || !docOpt.get().getUserId().equals(auth.getName())) {
+        if (docOpt.isEmpty() || !docOpt.get().getOwnerId().equals(auth.getName())) {
             return ResponseEntity.status(403).build();
         }
 
@@ -89,11 +89,15 @@ public class DocumentService {
         Optional<DocumentEntity> docOpt = documentRepository.findById(id);
 
         // Jeśli dokument nie istnieje lub nie należy do użytkownika – zwróć pusty Optional
-        if (docOpt.isEmpty() || !docOpt.get().getUserId().equals(authentication.getName())) {
+        if (docOpt.isEmpty() || !docOpt.get().getOwnerId().equals(authentication.getName())) {
             return Optional.empty();
         }
 
         return docOpt;
+    }
+
+    public void updateDocument(DocumentEntity doc) {
+        documentRepository.save(doc);
     }
 
 }

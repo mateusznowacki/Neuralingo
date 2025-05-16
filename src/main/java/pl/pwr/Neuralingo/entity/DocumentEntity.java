@@ -2,7 +2,6 @@ package pl.pwr.Neuralingo.entity;
 
 import lombok.Builder;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 
@@ -24,7 +23,7 @@ public class DocumentEntity {
     private String sourceLanguage;
     private String targetLanguage;
 
-    private String userId;
+    private String ownerId;
 
 
     public String getId() {
@@ -99,11 +98,11 @@ public class DocumentEntity {
         this.targetLanguage = targetLanguage;
     }
 
-    public String getUserId() {
-        return userId;
+    public String getOwnerId() {
+        return ownerId;
     }
 
-    public void setUserId(String userId) {
-        this.userId = userId;
+    public void setOwnerId(String ownerId) {
+        this.ownerId = ownerId;
     }
 }
