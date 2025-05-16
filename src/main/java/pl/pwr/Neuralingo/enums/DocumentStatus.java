@@ -1,9 +1,5 @@
 package pl.pwr.Neuralingo.enums;
 
 public enum DocumentStatus {
-    PENDING,
-    IN_PROGRESS,
-    COMPLETED,
-    ARCHIVED,
-    DELETED
+    UPLOADED,EXTRACTED, TRANSLATED, PENDING, ERROR, DELETED, ARCHIVED, IN_PROGRESS, COMPLETED, CANCELLED
 }

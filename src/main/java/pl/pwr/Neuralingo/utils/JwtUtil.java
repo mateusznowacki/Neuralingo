@@ -13,8 +13,8 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secretKey;  // Klucz tajny, przechowywany w bezpieczny sposób (np. w zmiennych środowiskowych)
 
-    private long jwtExpirationInMs = 3600000;  // 1 godzina dla access token
-    private long refreshTokenExpirationInMs = 2592000000L;  // 30 dni dla refresh token
+    private final long jwtExpirationInMs = 3600000;  // 1 godzina dla access token
+    private final long refreshTokenExpirationInMs = 2592000000L;  // 30 dni dla refresh token
 
     // Generowanie Access Token - używamy tylko userId
     public String generateAccessToken(String userId) {

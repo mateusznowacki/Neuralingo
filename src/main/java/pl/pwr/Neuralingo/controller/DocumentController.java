@@ -1,16 +1,14 @@
 package pl.pwr.Neuralingo.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import pl.pwr.Neuralingo.entity.OriginalDocument;
+import pl.pwr.Neuralingo.entity.DocumentEntity;
 import pl.pwr.Neuralingo.service.DocumentService;
 
 import java.util.List;
@@ -22,38 +20,33 @@ public class DocumentController {
     @Autowired
     private DocumentService documentService;
 
-    @PreAuthorize("isAuthenticated()")
+    // 1. Upload dokumentu
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<OriginalDocument> upload(
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<DocumentEntity> uploadDocument(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("metadata") String metadataJson,
-            Authentication authentication
-    ) throws JsonProcessingException {
-        String ownerId = authentication.getName();
-        OriginalDocument saved = documentService.handleUpload(file, metadataJson, ownerId);
-        return ResponseEntity.ok(saved);
+            Authentication authentication) throws JsonProcessingException {
+        return documentService.uploadDocument(file, authentication);
     }
 
+    // 2. Pobierz wszystkie dokumenty użytkownika
+    @GetMapping
     @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<DocumentEntity>> getAllUserDocuments(Authentication authentication) {
+        return documentService.getAllUserDocuments(authentication);
+    }
+
+    // 3. Pobierz dokument po ID
     @GetMapping("/{id}")
-    public ResponseEntity<byte[]> getOriginalDocument(@PathVariable String id, Authentication authentication) {
-        OriginalDocument doc = documentService.getDocumentByIdAndUser(id, authentication.getName());
-
-        byte[] fileContent = documentService.downloadFromBlob(doc.getStoragePath());
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + doc.getTitle() + "\"")
-                .contentType(MediaType.parseMediaType(doc.getFileType()))
-                .body(fileContent);
-    }
-
     @PreAuthorize("isAuthenticated()")
-    @GetMapping("/user")
-    public ResponseEntity<List<OriginalDocument>> getUserDocuments(Authentication authentication) {
-        return ResponseEntity.ok(documentService.getDocumentsByUser(authentication.getName()));
+    public ResponseEntity<DocumentEntity> getDocumentById(@PathVariable String id, Authentication authentication) {
+        return documentService.getDocumentById(id, authentication);
     }
 
-
-
-
+    // 4. Usuń dokument po ID
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteDocumentById(@PathVariable String id, Authentication authentication) {
+        return documentService.deleteDocumentById(id, authentication);
+    }
 }
