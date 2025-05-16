@@ -5,14 +5,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.entity.DocumentEntity;
 import pl.pwr.Neuralingo.entity.User;
-
 import pl.pwr.Neuralingo.repository.DocumentRepository;
 import pl.pwr.Neuralingo.repository.UserRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentService {
@@ -26,7 +27,7 @@ public class DocumentService {
     @Autowired
     private AzureBlobService azureBlobService;
 
-    public ResponseEntity<DocumentEntity> uploadDocument(MultipartFile file, Authentication auth) {
+    public ResponseEntity<DocumentDTO> uploadDocument(MultipartFile file, Authentication auth) {
         String userId = auth.getName();
         Optional<User> userOpt = userRepository.findById(userId);
 
@@ -37,53 +38,49 @@ public class DocumentService {
         User user = userOpt.get();
 
         try {
-            // 1. Najpierw utwórz obiekt i zapisz go, by mieć ID
             DocumentEntity doc = DocumentEntity.builder()
                     .originalFilename(file.getOriginalFilename())
                     .fileType(file.getContentType())
                     .sourceLanguage(user.getNativeLanguage())
-                    .user(user)
+                    .userId(user.getId())
                     .build();
 
-            documentRepository.save(doc); // teraz doc.getId() jest dostępne
+            documentRepository.save(doc);
 
-            // 2. Upload pliku z nazwą = ID
             String blobUrl = azureBlobService.uploadFile(file, doc.getId());
 
-            // 3. Zaktualizuj ścieżkę i zapisz ponownie
             doc.setOriginalStoragePath(blobUrl);
             documentRepository.save(doc);
 
-            return ResponseEntity.ok(doc);
+            return ResponseEntity.ok(DocumentDTO.from(doc));
 
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
         }
     }
 
-    public ResponseEntity<List<DocumentEntity>> getAllUserDocuments(Authentication auth) {
+    public ResponseEntity<List<DocumentDTO>> getAllUserDocuments(Authentication auth) {
         String userId = auth.getName();
         List<DocumentEntity> docs = documentRepository.findByUserId(userId);
-        return ResponseEntity.ok(docs);
+        List<DocumentDTO> result = docs.stream().map(DocumentDTO::from).collect(Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
-    public ResponseEntity<DocumentEntity> getDocumentById(String id, Authentication auth) {
+    public ResponseEntity<DocumentDTO> getDocumentById(String id, Authentication auth) {
         Optional<DocumentEntity> docOpt = documentRepository.findById(id);
-        if (docOpt.isEmpty() || !docOpt.get().getUser().getId().equals(auth.getName())) {
+        if (docOpt.isEmpty() || !docOpt.get().getUserId().equals(auth.getName())) {
             return ResponseEntity.status(403).build();
         }
-        return ResponseEntity.ok(docOpt.get());
+        return ResponseEntity.ok(DocumentDTO.from(docOpt.get()));
     }
 
     public ResponseEntity<Void> deleteDocumentById(String id, Authentication auth) {
         Optional<DocumentEntity> docOpt = documentRepository.findById(id);
-        if (docOpt.isEmpty() || !docOpt.get().getUser().getId().equals(auth.getName())) {
+        if (docOpt.isEmpty() || !docOpt.get().getUserId().equals(auth.getName())) {
             return ResponseEntity.status(403).build();
         }
 
-        // Usuń z Azure Blob (nazwa blobu = ID dokumentu)
         azureBlobService.deleteFile(id);
-
         documentRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

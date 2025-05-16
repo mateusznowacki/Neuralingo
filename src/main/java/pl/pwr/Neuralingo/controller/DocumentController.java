@@ -8,7 +8,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import pl.pwr.Neuralingo.entity.DocumentEntity;
+
+import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.service.DocumentService;
 
 import java.util.List;
@@ -23,7 +24,7 @@ public class DocumentController {
     // 1. Upload dokumentu
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<DocumentEntity> uploadDocument(
+    public ResponseEntity<DocumentDTO> uploadDocument(
             @RequestParam("file") MultipartFile file,
             Authentication authentication) throws JsonProcessingException {
         return documentService.uploadDocument(file, authentication);
@@ -32,14 +33,14 @@ public class DocumentController {
     // 2. Pobierz wszystkie dokumenty użytkownika
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<DocumentEntity>> getAllUserDocuments(Authentication authentication) {
+    public ResponseEntity<List<DocumentDTO>> getAllUserDocuments(Authentication authentication) {
         return documentService.getAllUserDocuments(authentication);
     }
 
     // 3. Pobierz dokument po ID
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<DocumentEntity> getDocumentById(@PathVariable String id, Authentication authentication) {
+    public ResponseEntity<DocumentDTO> getDocumentById(@PathVariable String id, Authentication authentication) {
         return documentService.getDocumentById(id, authentication);
     }
 

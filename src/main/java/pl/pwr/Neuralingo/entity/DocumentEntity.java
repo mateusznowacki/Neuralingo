@@ -25,8 +25,8 @@ public class DocumentEntity {
     private String sourceLanguage;
     private String targetLanguage;
 
-    @DBRef
-    private User user;
+    private String userId;
+
 
     public String getId() {
         return id;
@@ -100,11 +100,11 @@ public class DocumentEntity {
         this.targetLanguage = targetLanguage;
     }
 
-    public User getUser() {
-        return user;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 }
