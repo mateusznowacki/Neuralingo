@@ -28,25 +28,33 @@ public class AuthService {
     @Autowired
     private PasswordService passwordService;
 
-    public ResponseEntity<String> register(RegisterRequestDTO dto) {
-        if (userService.existsByEmail(dto.email())) {
-            return ResponseEntity.status(400).body("User with this email already exists.");
-        }
-
-        User user = new User();
-        user.setEmail(dto.email());
-        user.setPassword(passwordService.encodePassword(dto.password()));
-        user.setFirstName(dto.firstName());
-        user.setLastName(dto.lastName());
-        user.setNativeLanguage(dto.nativeLanguage());
-        user.setRole(Role.USER);
-        user.setActive(true);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setRecentDocumentIds(Collections.emptyList());
-
-        userService.registerUser(user);
-        return ResponseEntity.ok("User registered successfully.");
+    public ResponseEntity<AccessTokenDTO> register(RegisterRequestDTO dto, HttpServletResponse response) {
+    if (userService.existsByEmail(dto.email())) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(null); // lub nowy DTO z komunikatem, jeśli chcesz
     }
+
+    User user = new User();
+    user.setEmail(dto.email());
+    user.setPassword(passwordService.encodePassword(dto.password()));
+    user.setFirstName(dto.firstName());
+    user.setLastName(dto.lastName());
+    user.setNativeLanguage(dto.nativeLanguage());
+    user.setRole(Role.USER);
+    user.setActive(true);
+    user.setCreatedAt(LocalDateTime.now());
+    user.setRecentDocumentIds(Collections.emptyList());
+
+    userService.registerUser(user);
+
+    String accessToken = jwtUtil.generateAccessToken(user.getId());
+    String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+
+    addCookieToResponse("refresh_token", refreshToken, response);
+
+    return ResponseEntity.ok(new AccessTokenDTO(accessToken));
+}
+
 
     public ResponseEntity<AccessTokenDTO> login(LoginRequestDTO loginRequestDTO, HttpServletResponse response) {
         String email = loginRequestDTO.email();
