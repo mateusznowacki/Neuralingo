@@ -10,7 +10,7 @@ import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.entity.DocumentEntity;
 import pl.pwr.Neuralingo.service.AzureBlobService;
 import pl.pwr.Neuralingo.service.DocumentService;
-import pl.pwr.Neuralingo.translation.word.DocumentTranslationFacade;
+import pl.pwr.Neuralingo.translation.DocumentTranslationFacade;
 
 import java.io.File;
 import java.io.IOException;
