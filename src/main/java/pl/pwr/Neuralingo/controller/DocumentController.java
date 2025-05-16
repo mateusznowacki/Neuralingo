@@ -10,9 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import pl.pwr.Neuralingo.dto.DocumentDTO;
+import pl.pwr.Neuralingo.entity.DocumentEntity;
+import pl.pwr.Neuralingo.service.AzureBlobService;
 import pl.pwr.Neuralingo.service.DocumentService;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/documents")
@@ -20,6 +23,9 @@ public class DocumentController {
 
     @Autowired
     private DocumentService documentService;
+
+    @Autowired
+    private AzureBlobService azureBlobService;
 
     // 1. Upload dokumentu
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -50,4 +56,57 @@ public class DocumentController {
     public ResponseEntity<Void> deleteDocumentById(@PathVariable String id, Authentication authentication) {
         return documentService.deleteDocumentById(id, authentication);
     }
+
+    // 5 pobierz dokument po ID
+    @GetMapping("/download/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable String id, Authentication authentication) {
+        Optional<DocumentEntity> docOpt = documentService.getEntityById(id, authentication);
+        if (docOpt.isEmpty()) {
+            return ResponseEntity.status(403).build();
+        }
+
+        DocumentEntity doc = docOpt.get();
+        byte[] content = azureBlobService.downloadFile(doc.getId());
+
+        String extension = getExtensionFromMime(doc.getFileType());
+        String filename = doc.getOriginalFilename();
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(doc.getFileType()))
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .body(content);
+    }
+
+
+  private String getExtensionFromMime(String mime) {
+    return switch (mime) {
+        case "application/pdf" -> "pdf";
+
+        // Word
+        case "application/msword" -> "doc";
+        case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
+
+        // Excel
+        case "application/vnd.ms-excel" -> "xls";
+        case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx";
+
+        // PowerPoint
+        case "application/vnd.ms-powerpoint" -> "ppt";
+        case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx";
+
+        // Visio
+        case "application/vnd.visio" -> "vsd";
+        case "application/vnd.ms-visio.drawing.main+xml" -> "vsdx";
+
+        // TXT
+        case "text/plain" -> "txt";
+
+        default -> "bin";
+    };
 }
+
+}
+
+
+

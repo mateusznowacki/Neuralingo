@@ -26,6 +26,16 @@ public class TranslatorController {
         this.word = word;
     }
 
+
+
+
+
+
+
+
+
+
+
 @GetMapping("/word")
 public ResponseEntity<String> translateWord() {
     try {
@@ -40,8 +50,5 @@ public ResponseEntity<String> translateWord() {
                 .body("Błąd podczas tłumaczenia: " + e.getMessage());
     }
 }
-
-
-
 
 }

@@ -84,4 +84,16 @@ public class DocumentService {
         documentRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }
+
+    public Optional<DocumentEntity> getEntityById(String id, Authentication authentication) {
+        Optional<DocumentEntity> docOpt = documentRepository.findById(id);
+
+        // Jeśli dokument nie istnieje lub nie należy do użytkownika – zwróć pusty Optional
+        if (docOpt.isEmpty() || !docOpt.get().getUserId().equals(authentication.getName())) {
+            return Optional.empty();
+        }
+
+        return docOpt;
+    }
+
 }

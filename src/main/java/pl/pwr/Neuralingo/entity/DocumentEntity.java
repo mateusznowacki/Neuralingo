@@ -16,7 +16,6 @@ public class DocumentEntity {
     private String fileType;
     private String originalFilename;
     private String originalStoragePath;
-
     private String translatedFilename;
     private String translatedFileType;
     private String translatedStoragePath;
