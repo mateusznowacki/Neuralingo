@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -17,7 +16,7 @@ import java.util.*;
 @Component
 public class PdfContentMerge {
 
-    public ExtractedText extractFromHtml(File htmlFile) throws IOException {
+    public ExtractedText mergeHtmlLines(String htmlFile) throws IOException {
         Document doc = Jsoup.parse(htmlFile, StandardCharsets.UTF_8.name());
         Elements textElements = doc.select("div.t");
 

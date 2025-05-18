@@ -1,66 +1,76 @@
 package pl.pwr.Neuralingo.translation.pdf;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
-import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 
 @Component
 public class PdfTranslator {
 
-    private final PDFTextReplacer textReplacer;
     private final PdfContentExtractor contentExtractor;
-    private final AzureDocumentTranslationService azure;
+    private final HtmlLayoutParser layoutParser;
     private final PdfContentMerge contentMerger;
+    private final AzureDocumentTranslationService azure;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    public PdfTranslator(PdfContentMerge contentMerger, PDFTextReplacer textReplacer, PdfContentExtractor contentExtractor, AzureDocumentTranslationService azure) {
-        this.textReplacer = textReplacer;
+    public PdfTranslator(PdfContentExtractor contentExtractor,
+                         HtmlLayoutParser layoutParser,
+                         PdfContentMerge contentMerger,
+                         AzureDocumentTranslationService azure) {
         this.contentExtractor = contentExtractor;
-        this.azure = azure;
+        this.layoutParser = layoutParser;
         this.contentMerger = contentMerger;
+        this.azure = azure;
     }
 
-    public String translatePdfDocument(File pdfFile, String targetLanguage) throws IOException {
-        // 1. Ekstrahuj tekst z PDF (czysty tekst)
-        ExtractedText extractedText = contentExtractor.extractText(pdfFile);
-        System.out.println("✅ ExtractedText zawiera: " + extractedText.paragraphs.size() + " paragrafów.");
+    public String translatePdfDocument(File pdfFile, String lang) throws IOException {
 
-        // 2. Konwertuj PDF na HTML (layout do podglądu)
-        String htmlView;
+        String htmlContent;
         try {
-            htmlView = contentExtractor.extractLayout(pdfFile);
+            // 1. Konwersja PDF → HTML jako String (pdf2htmlEX)
+            htmlContent = contentExtractor.extractLayout(pdfFile);
+            System.out.println("✅ [1] Konwersja PDF zakończona.");
         } catch (InterruptedException e) {
-            throw new IOException("PDF to HTML conversion failed", e);
+            throw new IOException("❌ Błąd konwersji PDF na HTML", e);
         }
 
-        // 3. Przetłumacz tekst
-        TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
-        System.out.println("✅ Przetłumaczono: " + translatedText.paragraphs.size() + " paragrafów.");
+// 2. Budowanie nowego HTML z czystą strukturą (<p>, <table>) na podstawie oryginalnego HTML
+        String structuredHtml = layoutParser.buildStructuredHtml(htmlContent);
 
-        // 4. Scal oryginał z tłumaczeniem
-        ExtractedText merged = contentMerger.mergeTranslation(extractedText, translatedText);
-        System.out.println("✅ Scalono oryginał z tłumaczeniem.");
+// 3. Zapisz nowy HTML do pliku obok PDF (np. plik_structured.html)
+        File htmlOutput = new File(
+                pdfFile.getParent(),
+                pdfFile.getName().replaceFirst("(?i)\\.pdf$", "_structured.html")
+        );
+        Files.writeString(htmlOutput.toPath(), structuredHtml);
+        System.out.println("✅ [2] Zapisano nowy HTML: " + htmlOutput.getName());
 
-        // 5. Zapisz jako JSON
-        File translatedJson = new File(pdfFile.getParent(), pdfFile.getName() + ".translated.json");
-        File mergedJson = new File(pdfFile.getParent(), pdfFile.getName() + ".merged.json");
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(translatedJson, translatedText);
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(mergedJson, merged);
 
-        System.out.println("✅ Zapisano: " + translatedJson.getName() + ", " + mergedJson.getName());
+// 5. Zapisz ExtractedText jako JSON (do dalszego użycia, np. tłumaczenia)
+//        File parsedJson = new File(pdfFile.getParent(), pdfFile.getName().replaceFirst("(?i)\\.pdf$", ".html_text.json"));
+//        objectMapper.writerWithDefaultPrettyPrinter().writeValue(parsedJson, extractedText);
+//        System.out.println("✅ [4] Zapisano tekst z HTML jako JSON: " + parsedJson.getName());
 
-        // 6. Zwróć HTML do poglądu (np. do wyświetlenia w przeglądarce)
-        return htmlView;
+//
+//        // 4. Przetłumacz tekst
+//        TranslatedText translated = azure.translate(parsedFromHtml, lang);
+//        System.out.println("✅ [4] Przetłumaczono tekst.");
+//
+//        // 5. Scal oryginał z tłumaczeniem
+//        ExtractedText merged = contentMerger.mergeTranslation(parsedFromHtml, translated);
+//        System.out.println("✅ [5] Scalono oryginał z tłumaczeniem.");
+//
+//        // 6. Zapisz jako JSON
+//        File translatedJson = new File(pdfFile.getParent(), pdfFile.getName().replaceFirst("(?i)\\.pdf$", ".translated.json"));
+//        File mergedJson = new File(pdfFile.getParent(), pdfFile.getName().replaceFirst("(?i)\\.pdf$", ".merged.json"));
+//        objectMapper.writerWithDefaultPrettyPrinter().writeValue(translatedJson, translated);
+//        objectMapper.writerWithDefaultPrettyPrinter().writeValue(mergedJson, merged);
+//        System.out.println("✅ [6] Zapisano pliki: " + translatedJson.getName() + ", " + mergedJson.getName());
+
+        return htmlContent;
     }
-
-
-
 }
