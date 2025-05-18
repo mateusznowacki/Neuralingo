@@ -1,7 +1,7 @@
 package pl.pwr.Neuralingo.translation.pdf;
 
 import org.springframework.stereotype.Component;
-import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
+import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
 
 import java.io.File;
@@ -11,32 +11,36 @@ import java.io.IOException;
 public class PdfTranslator {
 
     private final PDFTextReplacer textReplacer;
-    private final PdfContentExtractor textExtractor;
+    private final PdfContentExtractor contentExtractor;
     private final AzureDocumentTranslationService azure;
 
-    public PdfTranslator(PDFTextReplacer textReplacer, PdfContentExtractor textExtractor, AzureDocumentTranslationService azure) {
+    public PdfTranslator(PDFTextReplacer textReplacer, PdfContentExtractor contentExtractor, AzureDocumentTranslationService azure) {
         this.textReplacer = textReplacer;
-        this.textExtractor = textExtractor;
+        this.contentExtractor = contentExtractor;
         this.azure = azure;
     }
 
     public String translatePdfDocument(File pdfFile, String targetLanguage) throws IOException {
-        // 1. Wyciągnięcie tekstu z PDF jako ExtractedText
-        PdfContentExtractor.ExtractedText extractedText = textExtractor.extractText(pdfFile);
+        // 1. Ekstrahuj tekst jako obiekt DTO
+        ExtractedText extractedText = contentExtractor.extractText(pdfFile);
 
-        // 2. Zapisz HTML tymczasowy (z data-index)
-        File htmlFile = new File(pdfFile.getAbsolutePath().replace(".pdf", "_extracted.html"));
-        textExtractor.saveAsHtml(extractedText, htmlFile);
+        // 2. Tymczasowy krok: konwertuj zawartość PDF na HTML (np. dla edytora lub poglądu)
+        String htmlView = null;
+        try {
+            htmlView = contentExtractor.extractLayout(pdfFile);
+        } catch (InterruptedException e) {
+            throw new IOException("PDF to HTML conversion failed", e);
+        }
 
-        // 3. Tłumaczenie paragrafów
-        TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
+        // TODO: 3. Przetłumacz każdy paragraf używając np. Azure Translator API
+        // TranslatedText translated = translatorService.translate(extractedText, targetLanguage);
 
-        // 4. Podmień tekst w HTML i zapisz jako PDF
-        File translatedPdfFile = textReplacer.replaceText(htmlFile, extractedText, translatedText);
+        // TODO: 4. Wygeneruj nowy dokument PDF/Word z tłumaczeniem i layoutem
 
-        // 5. Zwróć ścieżkę do przetłumaczonego PDF
-        return translatedPdfFile.getAbsolutePath();
-        return "";
+        // TODO: 5. Zapisz plik wynikowy i zwróć jego ścieżkę lub URL
+
+        // Tymczasowo zwróć tylko HTML do podglądu
+        return htmlView;
     }
 
 
