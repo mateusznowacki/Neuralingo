@@ -1,10 +1,8 @@
 package pl.pwr.Neuralingo.translation.pdf;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfReader;
-import com.itextpdf.kernel.pdf.canvas.parser.PdfTextExtractor;
-import com.itextpdf.kernel.pdf.canvas.parser.listener.LocationTextExtractionStrategy;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 
@@ -25,11 +23,7 @@ public class PdfContentExtractor {
         File htmlOutput = new File(pdfFile.getParent(), pdfFile.getName() + ".html");
         File tempDir = pdfFile.getParentFile();
 
-        for (File file : tempDir.listFiles()) {
-            if (file.isFile() && !file.getName().endsWith(".pdf") && !file.getName().endsWith(".json")) {
-                file.delete();
-            }
-        }
+
 
         ProcessBuilder builder = new ProcessBuilder(
                 "pdf2htmlEX",
@@ -59,27 +53,32 @@ public class PdfContentExtractor {
 
 
     public ExtractedText extractText(File pdfFile) throws IOException {
-        System.out.println("➡️ Rozpoczynam ekstrakcję tekstu z: " + pdfFile.getAbsolutePath());
-
         List<ExtractedText.Paragraph> paragraphs = new ArrayList<>();
-        try (PdfDocument pdfDoc = new PdfDocument(new PdfReader(pdfFile))) {
-            for (int i = 1; i <= pdfDoc.getNumberOfPages(); i++) {
-                String content = PdfTextExtractor.getTextFromPage(pdfDoc.getPage(i), new LocationTextExtractionStrategy());
-                System.out.println("📄 Strona " + i + " zawiera " + content.length() + " znaków");
-                paragraphs.add(new ExtractedText.Paragraph(i, content));
+
+        try (PDDocument document = PDDocument.load(pdfFile)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            String rawText = stripper.getText(document); // całość tekstu z PDF
+
+            String[] lines = rawText.split("\\r?\\n"); // każda linia osobno
+            int index = 1;
+
+            for (String line : lines) {
+                // Nie usuwamy linii pustych, tylko je pomijamy przy zapisie do JSON
+                String trimmed = line.strip();
+                if (!trimmed.isEmpty()) {
+                    paragraphs.add(new ExtractedText.Paragraph(index++, trimmed));
+                }
             }
         }
 
         ExtractedText extractedText = new ExtractedText(paragraphs);
 
-        File outputJson = new File(pdfFile.getParent(), pdfFile.getName() + ".json");
-        System.out.println("📁 Zapisuję JSON do: " + outputJson.getAbsolutePath());
-
+        // Zapisz do JSON (plik o tej samej nazwie co PDF + .json)
+        File outputJson = new File(pdfFile.getParent(), pdfFile.getName().replaceFirst("(?i)\\.pdf$", ".json"));
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(outputJson, extractedText);
-
-        System.out.println("✅ JSON zapisany: " + outputJson.getAbsolutePath());
 
         return extractedText;
     }
+
 
 }
