@@ -21,11 +21,17 @@ public class PdfContentExtractor {
 
         ProcessBuilder builder = new ProcessBuilder(
                 "pdf2htmlEX",
-                "--embed", "everything",
+                "--embed-css", "1",
+                "--embed-font", "1",
+                "--embed-image", "1",
+                "--embed-javascript", "1",
+                "--embed-outline", "1",
+                "--split-pages", "0", // <-- bardzo ważne: JEDEN HTML a nie wiele!
                 "--embed-external-font", "1",
                 "--dest-dir", tempDir.getAbsolutePath(),
                 pdfFile.getAbsolutePath()
         );
+
 
         builder.redirectErrorStream(true);
         Process process = builder.start();
