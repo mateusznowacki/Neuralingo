@@ -23,11 +23,13 @@ public class PdfTranslator {
     public String translatePdfDocument(File pdfFile, String targetLanguage) throws IOException {
         // 1. Ekstrahuj tekst jako obiekt DTO
         ExtractedText extractedText = contentExtractor.extractText(pdfFile);
+        System.out.println("✅ JSON zapisany dla pliku: " + pdfFile.getName());
 
-        // 2. Tymczasowy krok: konwertuj zawartość PDF na HTML (np. dla edytora lub poglądu)
-        String htmlView = null;
+        // 2. Tymczasowy krok: konwertuj zawartość PDF na HTML (np. dla edytora lub podglądu)
+        String htmlView;
         try {
             htmlView = contentExtractor.extractLayout(pdfFile);
+            System.out.println("✅ HTML wygenerowany dla: " + pdfFile.getName());
         } catch (InterruptedException e) {
             throw new IOException("PDF to HTML conversion failed", e);
         }
@@ -39,7 +41,7 @@ public class PdfTranslator {
 
         // TODO: 5. Zapisz plik wynikowy i zwróć jego ścieżkę lub URL
 
-        // Tymczasowo zwróć tylko HTML do podglądu
+        // Tymczasowo zwróć HTML do podglądu
         return htmlView;
     }
 
