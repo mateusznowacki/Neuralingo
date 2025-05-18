@@ -21,7 +21,7 @@ public class PdfContentExtractor {
 
         ProcessBuilder builder = new ProcessBuilder(
                 "pdf2htmlEX",
-                "--embed", "cfijo",
+                "--embed", "everything",
                 "--embed-external-font", "1",
                 "--dest-dir", tempDir.getAbsolutePath(),
                 pdfFile.getAbsolutePath()

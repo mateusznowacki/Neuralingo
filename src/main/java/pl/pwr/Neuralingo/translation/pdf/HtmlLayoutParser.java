@@ -1,50 +1,62 @@
 package pl.pwr.Neuralingo.translation.pdf;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.nodes.Node;
-import org.jsoup.nodes.TextNode;
-import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class HtmlLayoutParser {
 
-    public String buildStructuredHtml(String htmlFile) {
-        Document doc = Jsoup.parse(htmlFile, "UTF-8");
+    public String buildStructuredHtml(String html) {
+        Pattern divPattern = Pattern.compile("(<div class=\"t[^\"]*\">)(.*?)(</div>)", Pattern.DOTALL);
+        Matcher matcher = divPattern.matcher(html);
+        StringBuffer result = new StringBuffer();
 
-        // Znajdujemy wszystkie <div class="t"> — zachowujemy strukturę
-        Elements textElements = doc.select("div.t");
+        while (matcher.find()) {
+            String open = matcher.group(1);
+            String innerHtml = matcher.group(2);
+            String close = matcher.group(3);
 
-        for (Element t : textElements) {
-            String fixedText = extractCleanText(t);
-            t.empty(); // wyczyść wnętrze
-            t.text(fixedText); // ustaw poprawny tekst
+            String newContent = rebuildTextInDiv(innerHtml);
+            matcher.appendReplacement(result, Matcher.quoteReplacement(open + newContent + close));
         }
 
-        return doc.html();
+        matcher.appendTail(result);
+        return result.toString();
     }
 
-    private String extractCleanText(Element t) {
-        StringBuilder merged = new StringBuilder();
+    private String rebuildTextInDiv(String innerHtml) {
+        Pattern textPattern = Pattern.compile("([^<]+)|(<[^>]+>)");
+        Matcher m = textPattern.matcher(innerHtml);
 
-        for (Node node : t.childNodes()) {
-            if (node instanceof TextNode) {
-                merged.append(((TextNode) node).text());
-            } else if (node instanceof Element) {
-                Element span = (Element) node;
+        List<String> textParts = new ArrayList<>();
+        List<String> tokens = new ArrayList<>();
 
-                // Pomijamy np. <span class="_ _0"> i podobne
-                if (span.classNames().stream().anyMatch(cls -> cls.matches("_\\d*"))) {
-                    continue;
-                }
-
-                // Rekurencyjnie scal tekst w spanach stylizacyjnych
-                merged.append(extractCleanText(span));
+        while (m.find()) {
+            if (m.group(1) != null) {
+                // czysty tekst – wycinamy i zapamiętujemy
+                textParts.add(m.group(1));
+                tokens.add(""); // zostawiamy puste miejsce
+            } else {
+                tokens.add(m.group(2)); // tag – przepisujemy bez zmian
             }
         }
 
-        return merged.toString().trim();
+        // scalony tekst
+        String combined = String.join("", textParts);
+
+        // znajdź ostatni pusty wpis (ostatni tekst, który był usunięty)
+        for (int i = tokens.size() - 1; i >= 0; i--) {
+            if (tokens.get(i).isEmpty()) {
+                tokens.set(i, combined); // wstaw scalony tekst
+                break;
+            }
+        }
+
+        // złóż całość
+        return String.join("", tokens);
     }
 }
