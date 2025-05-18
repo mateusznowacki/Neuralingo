@@ -17,14 +17,17 @@ public class PdfTranslator {
     private final HtmlLayoutParser layoutParser;
     private final HtmlTextReplacer textReplacer;
     private final AzureDocumentTranslationService azure;
+    private final HtmlToPdfConverter pdfConverter;
 
     public PdfTranslator(PdfContentExtractor contentExtractor,
                          HtmlLayoutParser layoutParser,
                          HtmlTextReplacer textReplacer,
+                         HtmlToPdfConverter pdfConverter,
                          AzureDocumentTranslationService azure) {
         this.contentExtractor = contentExtractor;
         this.layoutParser = layoutParser;
         this.textReplacer = textReplacer;
+        this.pdfConverter = pdfConverter;
         this.azure = azure;
     }
 
@@ -64,8 +67,15 @@ public class PdfTranslator {
 // zapisz jako HTML
         Files.writeString(translatedHtmlFile.toPath(), translatedHtml, StandardCharsets.UTF_8);
 
+        File pdfOutput = new File(
+                pdfFile.getParent(),
+                pdfFile.getName().replaceFirst("(?i)\\.pdf$", "_translated.pdf")
+        );
+        // 5. Konwersja HTML → PDF (itext8)
+        pdfOutput = pdfConverter.convertHtmlToPdf(translatedHtmlFile);
 
-        return "";
+
+        return pdfOutput.getAbsolutePath();
 
     }
 }
