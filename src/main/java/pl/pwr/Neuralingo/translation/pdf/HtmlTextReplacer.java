@@ -9,62 +9,32 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
 @Component
 public class HtmlTextReplacer {
 
-    public String replaceText(String originalHtml, ExtractedText original, TranslatedText translated) {
-        List<TranslatedText.Paragraph> translatedParagraphs = translated.paragraphs;
+    public String replaceText(String html, ExtractedText original, TranslatedText translated) {
+        String updatedHtml = html;
 
-        StringBuilder result = new StringBuilder();
-        Pattern divPattern = Pattern.compile("(<div class=\"t[^\"]*\">)(.*?)(</div>)", Pattern.DOTALL);
-        Matcher matcher = divPattern.matcher(originalHtml);
+        List<ExtractedText.Paragraph> originalParagraphs = original.getParagraphs();
+        List<TranslatedText.Paragraph> translatedParagraphs = translated.getParagraphs();
 
-        int paraIndex = 0;
+        int size = Math.min(originalParagraphs.size(), translatedParagraphs.size());
 
-        while (matcher.find()) {
-            String openTag = matcher.group(1);
-            String innerHtml = matcher.group(2);
-            String closeTag = matcher.group(3);
+        for (int i = 0; i < size; i++) {
+            String originalText = originalParagraphs.get(i).text.trim();
+            String translatedText = translatedParagraphs.get(i).text;
 
-            if (paraIndex >= translatedParagraphs.size()) {
-                matcher.appendReplacement(result, Matcher.quoteReplacement(openTag + innerHtml + closeTag));
-                continue;
+            if (!originalText.isEmpty() && updatedHtml.contains(originalText)) {
+                updatedHtml = updatedHtml.replaceFirst(Pattern.quote(originalText), Matcher.quoteReplacement(translatedText));
             }
-
-            String translatedText = translatedParagraphs.get(paraIndex).text;
-            paraIndex++;
-
-            // Zamień cały tekst w obrębie <div> na przetłumaczony, zachowując tagi
-            String replacedContent = replaceVisibleText(innerHtml, translatedText);
-            matcher.appendReplacement(result, Matcher.quoteReplacement(openTag + replacedContent + closeTag));
         }
 
-        matcher.appendTail(result);
-        return result.toString();
+        return updatedHtml;
     }
 
-    private String replaceVisibleText(String htmlFragment, String newText) {
-        // usuń wszystkie fragmenty tekstowe (czyli nie w <...>) i zostaw tylko strukturę
-        // a potem wstaw newText w miejsce pierwszego tekstu
-        Pattern partPattern = Pattern.compile("(<[^>]+>)|([^<]+)");
-        Matcher matcher = partPattern.matcher(htmlFragment);
 
-        StringBuilder rebuilt = new StringBuilder();
-        boolean replaced = false;
 
-        while (matcher.find()) {
-            if (matcher.group(1) != null) {
-                // tag
-                rebuilt.append(matcher.group(1));
-            } else if (matcher.group(2) != null && !replaced) {
-                // pierwszy tekst – zamień
-                rebuilt.append(newText);
-                replaced = true;
-            }
-            // inne teksty pomijamy – zastępujemy tylko cały widoczny tekst
-        }
 
-        return rebuilt.toString();
-    }
 }
 

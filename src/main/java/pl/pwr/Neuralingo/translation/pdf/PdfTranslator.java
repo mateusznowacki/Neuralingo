@@ -32,50 +32,59 @@ public class PdfTranslator {
     }
 
     public String translatePdfDocument(File pdfFile, String targetLanguage) throws IOException {
-
         String htmlContent;
+
         try {
             // 1. Konwersja PDF → HTML jako String (pdf2htmlEX)
             htmlContent = contentExtractor.extractLayout(pdfFile);
         } catch (InterruptedException e) {
-            throw new IOException("Błąd konwersji PDF na HTML", e);
+            throw new IOException("❌ Błąd konwersji PDF na HTML", e);
         }
 
+        // 2. Przebuduj HTML (scalenie wyrazów, stylizacja itp.)
         String structuredHtml = layoutParser.buildStructuredHtml(htmlContent);
 
-// 3. Zapisz nowy HTML do pliku obok PDF (np. plik_structured.html)
-        File htmlOutput = new File(
-                pdfFile.getParent(),
+        // 3. Zapisz plik structured.html obok PDF
+        File htmlStructuredFile = new File(
+                pdfFile.getParentFile(),
                 pdfFile.getName().replaceFirst("(?i)\\.pdf$", "_structured.html")
         );
-        Files.writeString(htmlOutput.toPath(), structuredHtml);
-        System.out.println("✅ [2] Zapisano nowy HTML: " + htmlOutput.getName());
+        Files.writeString(htmlStructuredFile.toPath(), structuredHtml, StandardCharsets.UTF_8);
+        System.out.println("✅ [1] Zapisano structured HTML: " + htmlStructuredFile.getName());
 
+        // 4. Ekstrakcja tekstu do tłumaczenia
         ExtractedText extractedText = contentExtractor.extractText(structuredHtml);
 
+        // 5. Tłumaczenie tekstu
         TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
 
+        // 6. Podmiana tekstu w HTML
         String translatedHtml = textReplacer.replaceText(structuredHtml, extractedText, translatedText);
 
-
-// wygeneruj nazwę pliku na podstawie PDF
+        // 7. Zapisz przetłumaczony HTML
         File translatedHtmlFile = new File(
                 pdfFile.getParentFile(),
                 pdfFile.getName().replaceFirst("(?i)\\.pdf$", "_translated.html")
         );
-
-// zapisz jako HTML
         Files.writeString(translatedHtmlFile.toPath(), translatedHtml, StandardCharsets.UTF_8);
+        System.out.println("✅ [2] Zapisano translated HTML: " + translatedHtmlFile.getName());
 
-        File pdfOutput = new File(
-                pdfFile.getParent(),
+        // 8. Konwersja HTML → PDF
+        File translatedPdfFile = new File(
+                pdfFile.getParentFile(),
                 pdfFile.getName().replaceFirst("(?i)\\.pdf$", "_translated.pdf")
         );
-        // 5. Konwersja HTML → PDF (itext8)
-        pdfOutput = pdfConverter.convertHtmlToPdf(translatedHtmlFile);
 
+        try {
+            File generatedPdf = pdfConverter.convertHtmlToPdf(translatedHtmlFile, translatedPdfFile); // zakładamy, że metoda przyjmuje input + output
+            System.out.println("✅ [3] Wygenerowano translated PDF: " + generatedPdf.getName());
+            return generatedPdf.getAbsolutePath();
 
-        return pdfOutput.getAbsolutePath();
+        } catch (IOException | InterruptedException e) {
+            throw new IOException("❌ Błąd konwersji HTML na PDF", e);
+        }
+
 
     }
+
 }

@@ -1,9 +1,5 @@
 package pl.pwr.Neuralingo.translation.pdf;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 
@@ -14,6 +10,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 @Component
@@ -56,12 +54,17 @@ public class PdfContentExtractor {
     public ExtractedText extractText(String htmlContent) {
         List<ExtractedText.Paragraph> paragraphs = new ArrayList<>();
 
-        Document doc = Jsoup.parse(htmlContent);
-        Elements divs = doc.select("div[class^=t]"); // tylko <div> których klasa zaczyna się od "t"
-
+        Pattern divPattern = Pattern.compile("<div class=\"t[^\"]*?\">(.*?)</div>", Pattern.DOTALL);
+        Matcher matcher = divPattern.matcher(htmlContent);
         int index = 0;
-        for (Element div : divs) {
-            String text = div.text().trim();
+
+        while (matcher.find()) {
+            String divContent = matcher.group(1);
+
+            // Usuwamy znaczniki HTML (ale zostawiamy tekst wewnątrz <span>)
+            String text = divContent.replaceAll("<[^>]+>", "").trim();
+
+            // Pomijamy puste
             if (!text.isEmpty()) {
                 paragraphs.add(new ExtractedText.Paragraph(index++, text));
             }
@@ -69,4 +72,27 @@ public class PdfContentExtractor {
 
         return new ExtractedText(paragraphs);
     }
+
+
+    private String extractVisibleTextOnly(String html) {
+        StringBuilder sb = new StringBuilder();
+        boolean insideTag = false;
+
+        for (int i = 0; i < html.length(); i++) {
+            char c = html.charAt(i);
+
+            if (c == '<') {
+                insideTag = true;
+            } else if (c == '>') {
+                insideTag = false;
+            } else if (!insideTag) {
+                sb.append(c);
+            }
+        }
+
+        return sb.toString().replace('\u00A0', ' ').replaceAll(" +", " ");
+    }
+
+
+
 }

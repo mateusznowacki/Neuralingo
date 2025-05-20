@@ -11,9 +11,14 @@ public class ExtractedText {
             this.index = index;
             this.text = text;
         }
+
     }
 
     public List<Paragraph> paragraphs;
+
+    public List<Paragraph> getParagraphs() {
+        return paragraphs;
+    }
 
     public ExtractedText(List<Paragraph> paragraphs) {
         this.paragraphs = paragraphs;
