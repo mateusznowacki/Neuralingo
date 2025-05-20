@@ -2,6 +2,7 @@ package pl.pwr.Neuralingo.translation.pdf;
 
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -12,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 
 @Component
 public class PdfContentExtractor {
@@ -51,8 +51,9 @@ public class PdfContentExtractor {
         return new String(java.nio.file.Files.readAllBytes(htmlOutput.toPath()), StandardCharsets.UTF_8);
     }
 
+
     public ExtractedText extractText(String htmlContent) {
-        List<ExtractedText.Paragraph> paragraphs = new ArrayList<>();
+        List<Paragraph> paragraphs = new ArrayList<>();
 
         Pattern divPattern = Pattern.compile("<div class=\"t[^\"]*?\">(.*?)</div>", Pattern.DOTALL);
         Matcher matcher = divPattern.matcher(htmlContent);
@@ -61,17 +62,17 @@ public class PdfContentExtractor {
         while (matcher.find()) {
             String divContent = matcher.group(1);
 
-            // Usuwamy znaczniki HTML (ale zostawiamy tekst wewnątrz <span>)
+            // Usuń wszystkie tagi, zostaw tylko tekst
             String text = divContent.replaceAll("<[^>]+>", "").trim();
 
-            // Pomijamy puste
             if (!text.isEmpty()) {
-                paragraphs.add(new ExtractedText.Paragraph(index++, text));
+                paragraphs.add(new Paragraph(index++, text));
             }
         }
 
         return new ExtractedText(paragraphs);
     }
+
 
 
     private String extractVisibleTextOnly(String html) {

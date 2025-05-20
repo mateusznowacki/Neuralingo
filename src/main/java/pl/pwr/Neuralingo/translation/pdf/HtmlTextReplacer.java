@@ -3,6 +3,7 @@ package pl.pwr.Neuralingo.translation.pdf;
 
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
 import java.util.List;
@@ -16,14 +17,14 @@ public class HtmlTextReplacer {
     public String replaceText(String html, ExtractedText original, TranslatedText translated) {
         String updatedHtml = html;
 
-        List<ExtractedText.Paragraph> originalParagraphs = original.getParagraphs();
-        List<TranslatedText.Paragraph> translatedParagraphs = translated.getParagraphs();
+        List<Paragraph> originalParagraphs = original.getParagraphs();
+        List<Paragraph> translatedParagraphs = translated.getParagraphs();
 
         int size = Math.min(originalParagraphs.size(), translatedParagraphs.size());
 
         for (int i = 0; i < size; i++) {
-            String originalText = originalParagraphs.get(i).text.trim();
-            String translatedText = translatedParagraphs.get(i).text;
+            String originalText = originalParagraphs.get(i).getText().trim();
+            String translatedText = translatedParagraphs.get(i).getText();
 
             if (!originalText.isEmpty() && updatedHtml.contains(originalText)) {
                 updatedHtml = updatedHtml.replaceFirst(Pattern.quote(originalText), Matcher.quoteReplacement(translatedText));
@@ -32,6 +33,7 @@ public class HtmlTextReplacer {
 
         return updatedHtml;
     }
+
 
 
 

@@ -3,6 +3,7 @@ package pl.pwr.Neuralingo.translation.word;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -14,66 +15,51 @@ import java.util.List;
 public class WordTextExtractor {
 
     public ExtractedText extractText(File file) throws IOException {
-        List<ExtractedText.Paragraph> paragraphList = new ArrayList<>();
-        final int[] index = {0};
+        List<Paragraph> paragraphList = new ArrayList<>();
+        int index = 0;
 
         try (FileInputStream fis = new FileInputStream(file);
              XWPFDocument document = new XWPFDocument(fis)) {
 
-            // Akapity
-            for (XWPFParagraph paragraph : document.getParagraphs()) {
-                String text = paragraph.getText();
-                if (text != null && !text.isBlank()) {
-                    paragraphList.add(new ExtractedText.Paragraph(index[0]++, text));
-                }
-            }
+            // Akapity główne
+            index = extractParagraphs(document.getParagraphs(), paragraphList, index);
 
             // Tabele
             for (XWPFTable table : document.getTables()) {
                 for (XWPFTableRow row : table.getRows()) {
                     for (XWPFTableCell cell : row.getTableCells()) {
-                        for (XWPFParagraph p : cell.getParagraphs()) {
-                            String text = p.getText();
-                            if (text != null && !text.isBlank()) {
-                                paragraphList.add(new ExtractedText.Paragraph(index[0]++, text));
-                            }
-                        }
+                        index = extractParagraphs(cell.getParagraphs(), paragraphList, index);
                     }
                 }
             }
 
             // Nagłówki
             for (XWPFHeader header : document.getHeaderList()) {
-                for (XWPFParagraph paragraph : header.getParagraphs()) {
-                    String text = paragraph.getText();
-                    if (text != null && !text.isBlank()) {
-                        paragraphList.add(new ExtractedText.Paragraph(index[0]++, text));
-                    }
-                }
+                index = extractParagraphs(header.getParagraphs(), paragraphList, index);
             }
 
             // Stopki
             for (XWPFFooter footer : document.getFooterList()) {
-                for (XWPFParagraph paragraph : footer.getParagraphs()) {
-                    String text = paragraph.getText();
-                    if (text != null && !text.isBlank()) {
-                        paragraphList.add(new ExtractedText.Paragraph(index[0]++, text));
-                    }
-                }
+                index = extractParagraphs(footer.getParagraphs(), paragraphList, index);
             }
 
-
-            // Przypisy dolne (footnotes)
+            // Przypisy dolne
             for (XWPFFootnote footnote : document.getFootnotes()) {
-                for (XWPFParagraph p : footnote.getParagraphs()) {
-                    String text = p.getText();
-                    if (text != null && !text.isBlank()) {
-                        paragraphList.add(new ExtractedText.Paragraph(index[0]++, text));
-                    }
-                }
+                index = extractParagraphs(footnote.getParagraphs(), paragraphList, index);
             }
         }
 
         return new ExtractedText(paragraphList);
+    }
+
+    private int extractParagraphs(List<XWPFParagraph> paragraphs, List<Paragraph> paragraphList, int startIndex) {
+        int index = startIndex;
+        for (XWPFParagraph paragraph : paragraphs) {
+            String text = paragraph.getText();
+            if (text != null && !text.isBlank()) {
+                paragraphList.add(new Paragraph(index++, text));
+            }
+        }
+        return index;
     }
 }

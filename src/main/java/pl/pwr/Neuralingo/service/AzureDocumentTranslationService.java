@@ -5,6 +5,7 @@ import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
 import java.io.BufferedReader;
@@ -31,35 +32,32 @@ public class AzureDocumentTranslationService {
     private String translatorRegion;
 
     public TranslatedText translate(ExtractedText extractedText, String targetLanguage) {
-        List<TranslatedText.Paragraph> translatedParagraphs = new ArrayList<>();
+        List<Paragraph> translatedParagraphs = new ArrayList<>();
         List<Integer> toTranslateIndexes = new ArrayList<>();
         List<String> toTranslateTexts = new ArrayList<>();
 
-        for (ExtractedText.Paragraph para : extractedText.paragraphs) {
-            if (shouldTranslate(para.text)) {
-                toTranslateIndexes.add(para.index);
-                toTranslateTexts.add(para.text);
+        for (Paragraph para : extractedText.getParagraphs()) {
+            if (shouldTranslate(para.getText())) {
+                toTranslateIndexes.add(para.getIndex());
+                toTranslateTexts.add(para.getText());
             } else {
-                translatedParagraphs.add(new TranslatedText.Paragraph(para.index, para.text));
+                translatedParagraphs.add(new Paragraph(para.getIndex(), para.getText()));
             }
         }
 
         List<String> translatedTexts = translateBatch(toTranslateTexts, targetLanguage);
 
         for (int i = 0; i < toTranslateIndexes.size(); i++) {
-            translatedParagraphs.add(new TranslatedText.Paragraph(toTranslateIndexes.get(i), translatedTexts.get(i)));
+            translatedParagraphs.add(new Paragraph(toTranslateIndexes.get(i), translatedTexts.get(i)));
         }
 
-        // Sort paragraphs by original index
-        translatedParagraphs.sort(Comparator.comparingInt(p -> p.index));
-
+        translatedParagraphs.sort(Comparator.comparingInt(Paragraph::getIndex));
         return new TranslatedText(translatedParagraphs);
     }
 
     private boolean shouldTranslate(String text) {
         if (text == null || text.trim().isEmpty()) return false;
-        String trimmed = text.trim();
-        return trimmed.matches(".*[\\p{L}].*"); // Skip if only digits, single chars, punctuation
+        return text.trim().matches(".*[\\p{L}].*");
     }
 
     private List<String> translateBatch(List<String> texts, String targetLanguage) {
@@ -84,7 +82,7 @@ public class AzureDocumentTranslationService {
 
             try (OutputStream os = connection.getOutputStream()) {
                 byte[] input = requestBody.toString().getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
+                os.write(input);
             }
 
             StringBuilder response = new StringBuilder();
@@ -109,7 +107,7 @@ public class AzureDocumentTranslationService {
             return translated;
 
         } catch (Exception e) {
-            throw new RuntimeException("Błąd podczas tłumaczenia tekstu przez Azure Translator", e);
+            throw new RuntimeException("Error while translating text via Azure Translator API", e);
         }
     }
 }

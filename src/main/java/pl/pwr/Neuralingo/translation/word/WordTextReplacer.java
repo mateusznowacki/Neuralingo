@@ -3,6 +3,7 @@ package pl.pwr.Neuralingo.translation.word;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
 import java.io.File;
@@ -20,8 +21,8 @@ public class WordTextReplacer {
                                   ExtractedText original,
                                   TranslatedText translated) throws IOException {
 
-        Map<Integer, String> translatedMap = translated.paragraphs.stream()
-                .collect(Collectors.toMap(p -> p.index, p -> p.text));
+        Map<Integer, String> translatedMap = translated.getParagraphs().stream()
+                .collect(Collectors.toMap(Paragraph::getIndex, Paragraph::getText));
 
         String outputPath = originalFile.getAbsolutePath().replace(".docx", "") + "_translated.docx";
         File outputFile = new File(outputPath);
