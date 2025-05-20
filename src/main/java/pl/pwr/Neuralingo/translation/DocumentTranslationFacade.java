@@ -25,8 +25,8 @@ public class DocumentTranslationFacade {
         if (fileName.endsWith(".docx")) {
             return wordTranslator.translateWordDocument(file, targetLanguage);
         } else if (fileName.endsWith(".pdf")) {
-            pdfTranslator.translatePdfDocument(file, targetLanguage);
-            return null;
+            return pdfTranslator.translatePdfDocument(file, targetLanguage);
+
         } else if (fileName.endsWith(".pptx")) {
             // TODO: analogicznie translatePptx(...)
             throw new UnsupportedOperationException("Tłumaczenie PPTX nie jest jeszcze wspierane");

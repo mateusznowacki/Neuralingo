@@ -23,17 +23,17 @@ import java.util.Optional;
 @RequestMapping("/api/translate")
 public class TranslatorController {
 
-    private final DocumentTranslationFacade wordTranslator;
+    private final DocumentTranslationFacade docTranslator;
     // private final OcrTranslationFacade ocrTranslator;
     private final AzureBlobService azureBlobService;
     private final DocumentService documentService;
 
     @Autowired
-    public TranslatorController(DocumentTranslationFacade wordTranslator,
+    public TranslatorController(DocumentTranslationFacade docTranslator,
                                 //  OcrTranslationFacade ocrTranslator,
                                 AzureBlobService azureBlobService,
                                 DocumentService documentService) {
-        this.wordTranslator = wordTranslator;
+        this.docTranslator = docTranslator;
         //  this.ocrTranslator = ocrTranslator;
         this.azureBlobService = azureBlobService;
         this.documentService = documentService;
@@ -59,7 +59,7 @@ public class TranslatorController {
 
             // 2. Translate document
             File inputFile = renamedPath.toFile();
-            String translatedPath = wordTranslator.translateDocument(inputFile, targetLanguage);
+            String translatedPath = docTranslator.translateDocument(inputFile, targetLanguage);
 
             // 3. Upload translated file back without extension
             File translatedFile = new File(translatedPath);
