@@ -1,0 +1,54 @@
+package pl.pwr.Neuralingo.translation.pptx;
+
+import org.apache.poi.xslf.usermodel.*;
+import org.springframework.stereotype.Component;
+import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+@Component
+public class PptxTextExtractor {
+
+    public ExtractedText extractText(File inputFile) throws IOException {
+        List<Paragraph> paragraphs = new ArrayList<>();
+        int[] index = {0};
+
+        try (FileInputStream fis = new FileInputStream(inputFile);
+             XMLSlideShow ppt = new XMLSlideShow(fis)) {
+
+            List<XSLFSlide> slides = ppt.getSlides();
+            for (int slideIndex = 0; slideIndex < slides.size(); slideIndex++) {
+                XSLFSlide slide = slides.get(slideIndex);
+                for (XSLFShape shape : slide.getShapes()) {
+                    extractTextFromShape(shape, paragraphs, index, slideIndex);
+                }
+            }
+        }
+
+        return new ExtractedText(paragraphs);
+    }
+
+    private void extractTextFromShape(XSLFShape shape, List<Paragraph> paragraphs, int[] index, int slideIndex) {
+        if (shape instanceof XSLFTextShape textShape) {
+            String text = textShape.getText();
+            if (text != null && !text.isBlank()) {
+                paragraphs.add(new Paragraph(index[0]++, text.trim(), slideIndex, 0, 0));
+            }
+        } else if (shape instanceof XSLFGroupShape group) {
+            for (XSLFShape inner : group.getShapes()) {
+                extractTextFromShape(inner, paragraphs, index, slideIndex);
+            }
+        } else if (shape instanceof XSLFTable table) {
+            for (XSLFTableRow row : table.getRows()) {
+                for (XSLFTableCell cell : row.getCells()) {
+                    extractTextFromShape(cell, paragraphs, index, slideIndex);
+                }
+            }
+        }
+    }
+}

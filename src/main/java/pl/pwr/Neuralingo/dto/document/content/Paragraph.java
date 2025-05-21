@@ -8,11 +8,18 @@ public class Paragraph {
     private int sheetIndex;
     private int rowIndex;
     private int columnIndex;
-
+    private Integer slideIndex;
 
     public Paragraph(int index, String text) {
         this.index = index;
         this.text = text;
+    }
+
+    // === Konstruktor dla PowerPoint ===
+    public Paragraph(int index, String text, int slideIndex) {
+        this.index = index;
+        this.text = text;
+        this.slideIndex = slideIndex;
     }
 
     public Paragraph(int index, String text, int sheetIndex, int rowIndex, int columnIndex) {
@@ -41,6 +48,10 @@ public class Paragraph {
 
     public String getText() {
         return text;
+    }
+
+    public Integer getSlideIndex() {
+        return slideIndex;
     }
 
 }
