@@ -15,51 +15,68 @@ import java.util.List;
 public class WordTextExtractor {
 
     public ExtractedText extractText(File file) throws IOException {
-        List<Paragraph> paragraphList = new ArrayList<>();
-        int index = 0;
+        List<Paragraph> paragraphs = new ArrayList<>();
+        int[] index = {0};
 
         try (FileInputStream fis = new FileInputStream(file);
-             XWPFDocument document = new XWPFDocument(fis)) {
+             XWPFDocument doc = new XWPFDocument(fis)) {
 
-            // Akapity główne
-            index = extractParagraphs(document.getParagraphs(), paragraphList, index);
+            // 1. Body (main content)
+            for (XWPFParagraph para : doc.getParagraphs()) {
+                extractFromParagraph(para, paragraphs, index);
+            }
 
-            // Tabele
-            for (XWPFTable table : document.getTables()) {
-                for (XWPFTableRow row : table.getRows()) {
-                    for (XWPFTableCell cell : row.getTableCells()) {
-                        index = extractParagraphs(cell.getParagraphs(), paragraphList, index);
-                    }
+            // 2. Tables in body
+            for (XWPFTable table : doc.getTables()) {
+                extractFromTable(table, paragraphs, index);
+            }
+
+            // 3. Headers
+            for (XWPFHeader header : doc.getHeaderList()) {
+                for (XWPFParagraph para : header.getParagraphs()) {
+                    extractFromParagraph(para, paragraphs, index);
+                }
+                for (XWPFTable table : header.getTables()) {
+                    extractFromTable(table, paragraphs, index);
                 }
             }
 
-            // Nagłówki
-            for (XWPFHeader header : document.getHeaderList()) {
-                index = extractParagraphs(header.getParagraphs(), paragraphList, index);
+            // 4. Footers
+            for (XWPFFooter footer : doc.getFooterList()) {
+                for (XWPFParagraph para : footer.getParagraphs()) {
+                    extractFromParagraph(para, paragraphs, index);
+                }
+                for (XWPFTable table : footer.getTables()) {
+                    extractFromTable(table, paragraphs, index);
+                }
             }
 
-            // Stopki
-            for (XWPFFooter footer : document.getFooterList()) {
-                index = extractParagraphs(footer.getParagraphs(), paragraphList, index);
-            }
+            return new ExtractedText(paragraphs);
 
-            // Przypisy dolne
-            for (XWPFFootnote footnote : document.getFootnotes()) {
-                index = extractParagraphs(footnote.getParagraphs(), paragraphList, index);
-            }
+        } catch (Exception e) {
+            throw new IOException("Failed to extract text from Word document", e);
         }
-
-        return new ExtractedText(paragraphList);
     }
 
-    private int extractParagraphs(List<XWPFParagraph> paragraphs, List<Paragraph> paragraphList, int startIndex) {
-        int index = startIndex;
-        for (XWPFParagraph paragraph : paragraphs) {
-            String text = paragraph.getText();
+    private void extractFromParagraph(XWPFParagraph para, List<Paragraph> paragraphs, int[] index) {
+        for (XWPFRun run : para.getRuns()) {
+            String text = run.text();
             if (text != null && !text.isBlank()) {
-                paragraphList.add(new Paragraph(index++, text));
+                paragraphs.add(new Paragraph(index[0]++, text.trim()));
             }
         }
-        return index;
+    }
+
+    private void extractFromTable(XWPFTable table, List<Paragraph> paragraphs, int[] index) {
+        for (XWPFTableRow row : table.getRows()) {
+            for (XWPFTableCell cell : row.getTableCells()) {
+                for (XWPFParagraph para : cell.getParagraphs()) {
+                    extractFromParagraph(para, paragraphs, index);
+                }
+                for (XWPFTable nestedTable : cell.getTables()) {
+                    extractFromTable(nestedTable, paragraphs, index);
+                }
+            }
+        }
     }
 }

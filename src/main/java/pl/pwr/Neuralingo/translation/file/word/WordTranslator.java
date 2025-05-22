@@ -30,7 +30,7 @@ public class WordTranslator {
         String outputPath = originalPath.replace(".docx", "") + "_translated.docx";
         File outputFile = new File(outputPath);
 
-        wordTextReplacer.replaceParagraphs(inputFile, extractedText, translatedText);
+        wordTextReplacer.replaceText(inputFile, extractedText, translatedText);
 
         return outputFile.getAbsolutePath();
     }

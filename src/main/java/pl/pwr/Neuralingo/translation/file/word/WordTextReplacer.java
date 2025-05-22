@@ -1,91 +1,90 @@
 package pl.pwr.Neuralingo.translation.file.word;
 
-import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 @Component
 public class WordTextReplacer {
 
-    public File replaceParagraphs(File originalFile,
-                                  ExtractedText original,
-                                  TranslatedText translated) throws IOException {
+    public File replaceText(File originalFile, ExtractedText original, TranslatedText translated) throws IOException {
+        String translatedName = originalFile.getName().replaceFirst("(?i)\\.docx$", "_translated.docx");
+        File resultFile = new File(originalFile.getParent(), translatedName);
 
-        Map<Integer, String> translatedMap = translated.getParagraphs().stream()
-                .collect(Collectors.toMap(Paragraph::getIndex, Paragraph::getText));
+        try (ZipFile zipFile = new ZipFile(originalFile);
+             ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(resultFile))) {
 
-        String outputPath = originalFile.getAbsolutePath().replace(".docx", "") + "_translated.docx";
-        File outputFile = new File(outputPath);
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
-        try (FileInputStream fis = new FileInputStream(originalFile);
-             XWPFDocument document = new XWPFDocument(fis)) {
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                InputStream is = zipFile.getInputStream(entry);
+                byte[] data;
 
-            int[] currentIndex = {0};
+                if (entry.getName().equals("word/document.xml")) {
+                    String xml = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 
-            for (XWPFParagraph paragraph : document.getParagraphs()) {
-                replaceTextIfExists(paragraph, translatedMap, currentIndex);
-            }
+                    List<Paragraph> originalParagraphs = original.getParagraphs();
+                    List<Paragraph> translatedParagraphs = translated.getParagraphs();
 
-            for (XWPFTable table : document.getTables()) {
-                for (XWPFTableRow row : table.getRows()) {
-                    for (XWPFTableCell cell : row.getTableCells()) {
-                        for (XWPFParagraph paragraph : cell.getParagraphs()) {
-                            replaceTextIfExists(paragraph, translatedMap, currentIndex);
+                    for (int i = 0; i < Math.min(originalParagraphs.size(), translatedParagraphs.size()); i++) {
+                        String originalText = originalParagraphs.get(i).getText();
+                        String translatedText = translatedParagraphs.get(i).getText().trim();
+
+                        if (originalText == null || originalText.trim().isEmpty() || translatedText.isEmpty())
+                            continue;
+
+                        String escapedOriginal = Pattern.quote(originalText.trim());
+                        Pattern pattern = Pattern.compile(">(\\s*)(" + escapedOriginal + ")(\\s*)<");
+                        Matcher matcher = pattern.matcher(xml);
+
+                        if (matcher.find()) {
+                            int end = matcher.end();
+
+                            // Sprawdzenie tylko końca – czy po dopasowaniu nie ma spacji ani znacznika
+                            boolean needsTrailingSpace = false;
+                            if (end < xml.length()) {
+                                char nextChar = xml.charAt(end);
+                                if (nextChar != '<' && nextChar != ' ') {
+                                    needsTrailingSpace = true;
+                                }
+                            }
+
+                            // Dodaj spację, jeśli oryginał kończył się spacją, a tłumaczenie jej nie ma
+                            if ((originalText.endsWith(" ") && !translatedText.endsWith(" ")) || needsTrailingSpace) {
+                                translatedText += " ";
+                            }
+
+                            String replacement = ">" + Matcher.quoteReplacement(translatedText) + "<";
+                            xml = matcher.replaceFirst(replacement);
                         }
                     }
-                }
-            }
 
-            for (XWPFHeader header : document.getHeaderList()) {
-                for (XWPFParagraph paragraph : header.getParagraphs()) {
-                    replaceTextIfExists(paragraph, translatedMap, currentIndex);
+                    data = xml.getBytes(StandardCharsets.UTF_8);
+                } else {
+                    data = is.readAllBytes();
                 }
-            }
 
-            for (XWPFFooter footer : document.getFooterList()) {
-                for (XWPFParagraph paragraph : footer.getParagraphs()) {
-                    replaceTextIfExists(paragraph, translatedMap, currentIndex);
-                }
-            }
-
-            for (XWPFFootnote footnote : document.getFootnotes()) {
-                for (XWPFParagraph paragraph : footnote.getParagraphs()) {
-                    replaceTextIfExists(paragraph, translatedMap, currentIndex);
-                }
-            }
-
-            try (FileOutputStream out = new FileOutputStream(outputFile)) {
-                document.write(out);
+                zos.putNextEntry(new ZipEntry(entry.getName()));
+                zos.write(data);
+                zos.closeEntry();
             }
         }
 
-        return outputFile;
-    }
-
-    private void replaceTextIfExists(XWPFParagraph paragraph, Map<Integer, String> map, int[] index) {
-        if (map.containsKey(index[0])) {
-            String newText = map.get(index[0]);
-            List<XWPFRun> runs = paragraph.getRuns();
-            if (!runs.isEmpty()) {
-                runs.get(0).setText(newText, 0);
-                for (int i = 1; i < runs.size(); i++) {
-                    runs.get(i).setText("", 0);
-                }
-            } else {
-                XWPFRun run = paragraph.createRun();
-                run.setText(newText);
-            }
-        }
-        index[0]++;
+        return resultFile;
     }
 }
