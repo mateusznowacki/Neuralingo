@@ -22,7 +22,9 @@ import java.util.zip.ZipOutputStream;
 public class PptxTextReplacer {
 
     public File replaceText(File originalFile, ExtractedText original, TranslatedText translated) throws IOException {
-        File resultFile = new File(originalFile.getParent(), "translated_" + originalFile.getName());
+        String translatedName = originalFile.getName().replaceFirst("(?i)\\.pptx$", "_translated.pptx");
+        File resultFile = new File(originalFile.getParent(), translatedName);
+
 
         try (ZipFile zipFile = new ZipFile(originalFile);
              ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(resultFile))) {
@@ -75,15 +77,15 @@ public class PptxTextReplacer {
                     data = xml.getBytes(StandardCharsets.UTF_8);
                 } else {
                     data = is.readAllBytes();
-            }
+                }
 
                 zos.putNextEntry(new ZipEntry(entry.getName()));
                 zos.write(data);
                 zos.closeEntry();
+            }
         }
-    }
 
         return resultFile;
-}
+    }
 
 }
