@@ -7,7 +7,7 @@ const os = require('os');
     const [, , htmlPath, targetPdfPath] = process.argv;
 
     if (!htmlPath || !targetPdfPath) {
-        console.error("❌ Usage: node html2pdf_gui.js input.html output.pdf");
+        console.error("❌ Usage: node html2pdf.js input.html output.pdf");
         process.exit(1);
     }
 
@@ -25,38 +25,38 @@ const os = require('os');
     const page = await browser.newPage();
     await page.goto(absoluteHtmlPath, {waitUntil: 'networkidle0'});
 
-    // Wywołanie drukowania
+    // Wywołaj drukowanie
     await page.evaluate(() => window.print());
 
-    // Szukaj najnowszego PDF w ~/Downloads
+    // Czekaj aż plik się zapisze
     let downloadedFile = null;
+
     for (let i = 0; i < 20; i++) {
-        const files = fs.readdirSync(downloadsDir)
+        const pdfFiles = fs.readdirSync(downloadsDir)
             .filter(f => f.endsWith('.pdf'))
             .map(f => ({
                 name: f,
+                fullPath: path.join(downloadsDir, f),
                 time: fs.statSync(path.join(downloadsDir, f)).mtime.getTime()
             }))
             .sort((a, b) => b.time - a.time);
 
-        if (files.length > 0) {
-            downloadedFile = path.join(downloadsDir, files[0].name);
+        if (pdfFiles.length > 0) {
+            downloadedFile = pdfFiles[0].fullPath;
             break;
         }
-        await new Promise(res => setTimeout(res, 300));
+
+        await new Promise(res => setTimeout(res, 500));
     }
 
     await browser.close();
 
     if (!downloadedFile || !fs.existsSync(downloadedFile)) {
-        console.error("❌ PDF was not found in Downloads.");
+        console.error("❌ PDF not found in Downloads.");
         process.exit(1);
     }
 
-    // Skopiuj do katalogu docelowego
+    // Skopiuj PDF do targetu
     fs.copyFileSync(downloadedFile, targetPdfPath);
-    fs.unlinkSync(downloadedFile); // Usuń z Downloads
-
-
+    console.log(`✅ PDF copied to: ${targetPdfPath}`);
 })();
-
