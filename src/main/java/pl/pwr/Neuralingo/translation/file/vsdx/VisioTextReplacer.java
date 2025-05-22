@@ -1,4 +1,4 @@
-package pl.pwr.Neuralingo.translation.pptx;
+package pl.pwr.Neuralingo.translation.file.vsdx;
 
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
@@ -19,12 +19,11 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 @Component
-public class PptxTextReplacer {
+public class VisioTextReplacer {
 
     public File replaceText(File originalFile, ExtractedText original, TranslatedText translated) throws IOException {
-        String translatedName = originalFile.getName().replaceFirst("(?i)\\.pptx$", "_translated.pptx");
-        File resultFile = new File(originalFile.getParent(), translatedName);
-
+        String outputFileName = originalFile.getName().replaceFirst("(?i)\\.vsdx$", "_translated.vsdx");
+        File resultFile = new File(originalFile.getParent(), outputFileName);
 
         try (ZipFile zipFile = new ZipFile(originalFile);
              ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(resultFile))) {
@@ -36,7 +35,7 @@ public class PptxTextReplacer {
                 InputStream is = zipFile.getInputStream(entry);
                 byte[] data;
 
-                if (entry.getName().startsWith("ppt/slides/slide") && entry.getName().endsWith(".xml")) {
+                if (entry.getName().startsWith("visio/pages/page") && entry.getName().endsWith(".xml")) {
                     String xml = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 
                     List<Paragraph> originalParagraphs = original.getParagraphs();
@@ -45,32 +44,37 @@ public class PptxTextReplacer {
                     for (int i = 0; i < Math.min(originalParagraphs.size(), translatedParagraphs.size()); i++) {
                         String originalText = originalParagraphs.get(i).getText();
                         String translatedText = translatedParagraphs.get(i).getText().trim();
-
-                        if (originalText == null || originalText.trim().isEmpty() || translatedText.isEmpty())
-                            continue;
+                        if (originalText == null || originalText.trim().isEmpty() || translatedText.isEmpty()) continue;
 
                         String escapedOriginal = Pattern.quote(originalText.trim());
                         Pattern pattern = Pattern.compile(">(\\s*)(" + escapedOriginal + ")(\\s*)<");
                         Matcher matcher = pattern.matcher(xml);
+                        StringBuffer sb = new StringBuffer();
+                        boolean replaced = false;
 
-                        if (matcher.find()) {
-                            int end = matcher.end();
 
-                            // Sprawdzenie tylko końca – czy po dopasowaniu nie ma spacji ani znacznika
-                            boolean needsTrailingSpace = false;
-                            if (end < xml.length()) {
-                                char nextChar = xml.charAt(end);
-                                if (nextChar != '<' && nextChar != ' ') {
-                                    needsTrailingSpace = true;
-                                }
-                            }
+                        while (matcher.find()) {
+                            String replacement = matcher.group(1) + preserveSpaces(matcher.group(2) + originalText + matcher.group(4), translatedText) + matcher.group(5);
+                            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+                            replaced = true;
 
-                            if ((originalText.endsWith(" ") && !translatedText.endsWith(" ")) || needsTrailingSpace) {
-                                translatedText += " ";
-                            }
+                            System.out.println("🔁 Podmieniono w pliku XML [" + entry.getName() + "]:");
+                            System.out.println("   ORYGINAŁ   → \"" + originalText + "\"");
+                            System.out.println("   TŁUMACZENIE → \"" + translatedText + "\"");
 
-                            String replacement = ">" + Matcher.quoteReplacement(translatedText) + "<";
-                            xml = matcher.replaceFirst(replacement);
+                            break; // tylko jedna zamiana na parę
+                        }
+                        if (replaced) {
+                            matcher.appendTail(sb);
+                            xml = sb.toString();
+                        } else {
+                            System.out.println("⚠️ NIE ZNALEZIONO regexem w [" + entry.getName() + "]: \"" + originalText + "\"");
+                        }
+
+
+                        if (replaced) {
+                            matcher.appendTail(sb);
+                            xml = sb.toString();
                         }
                     }
 
@@ -88,4 +92,13 @@ public class PptxTextReplacer {
         return resultFile;
     }
 
+    private String preserveSpaces(String original, String translated) {
+        if (original.startsWith(" ") && !translated.startsWith(" ")) {
+            translated = " " + translated;
+        }
+        if (original.endsWith(" ") && !translated.endsWith(" ")) {
+            translated = translated + " ";
+        }
+        return translated;
+    }
 }

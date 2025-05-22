@@ -1,4 +1,4 @@
-package pl.pwr.Neuralingo.translation.word;
+package pl.pwr.Neuralingo.translation.file.word;
 
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.stereotype.Component;

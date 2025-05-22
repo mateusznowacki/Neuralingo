@@ -1,4 +1,4 @@
-package pl.pwr.Neuralingo.translation.xlsx;
+package pl.pwr.Neuralingo.translation.file.xlsx;
 
 
 import org.apache.poi.ss.usermodel.*;

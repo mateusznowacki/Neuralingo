@@ -24,17 +24,14 @@ import java.util.Optional;
 public class TranslatorController {
 
     private final DocumentTranslationFacade docTranslator;
-    // private final OcrTranslationFacade ocrTranslator;
     private final AzureBlobService azureBlobService;
     private final DocumentService documentService;
 
     @Autowired
     public TranslatorController(DocumentTranslationFacade docTranslator,
-                                //  OcrTranslationFacade ocrTranslator,
                                 AzureBlobService azureBlobService,
                                 DocumentService documentService) {
         this.docTranslator = docTranslator;
-        //  this.ocrTranslator = ocrTranslator;
         this.azureBlobService = azureBlobService;
         this.documentService = documentService;
     }
@@ -57,7 +54,7 @@ public class TranslatorController {
             Files.move(originalPath, renamedPath, StandardCopyOption.REPLACE_EXISTING);
 
             File inputFile = renamedPath.toFile();
-            String translatedPath = docTranslator.translateDocument(inputFile, targetLanguage);
+            String translatedPath = docTranslator.translateFileDocument(inputFile, targetLanguage);
 
             File translatedFile = new File(translatedPath);
             String translatedBlobName = id + "_translated";
@@ -74,31 +71,40 @@ public class TranslatorController {
         }
     }
 
+    @PostMapping("/document/ocr/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<DocumentDTO> translateOcrDocumentById(@PathVariable String id,
+                                                                @RequestParam String targetLanguage,
+                                                                Authentication auth) {
+        Optional<DocumentEntity> docOpt = documentService.getEntityById(id, auth);
+        if (docOpt.isEmpty()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-//    @PostMapping("/ocr/{id}")
-//    @PreAuthorize("isAuthenticated()")
-//    public ResponseEntity<DocumentDTO> translateOcrById(@PathVariable String id,
-//                                                        @RequestParam String targetLanguage,
-//                                                        Authentication auth) {
-//        Optional<DocumentEntity> docOpt = documentService.getEntityById(id, auth);
-//        if (docOpt.isEmpty()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-//
-//        try {
-//            File inputFile = new File(azureBlobService.downloadLocal(id));
-//            String translatedPath = ocrTranslator.translateDocument(inputFile, targetLanguage);
-//
-//            DocumentEntity doc = docOpt.get();
-//            doc.setTargetLanguage(targetLanguage);
-//            doc.setTranslatedStoragePath(translatedPath);
-//            documentService.updateDocument(doc);
-//
-//            return ResponseEntity.ok(DocumentDTO.from(doc));
-//        } catch (IOException e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                    .build();
-//        }
-//    }
+        try {
+            DocumentEntity doc = docOpt.get();
+            String extension = getExtension(doc.getFileType(), doc.getOriginalFilename());
 
+            String rawPath = azureBlobService.downloadLocal(id);
+            Path originalPath = Path.of(rawPath);
+            Path renamedPath = Path.of(rawPath + "." + extension);
+            Files.move(originalPath, renamedPath, StandardCopyOption.REPLACE_EXISTING);
+
+            File inputFile = renamedPath.toFile();
+            String translatedPath = docTranslator.translateOcrDocument(inputFile, targetLanguage);
+
+            File translatedFile = new File(translatedPath);
+            String translatedBlobName = id + "_translated";
+            String translatedBlobUrl = azureBlobService.uploadFile(translatedFile, translatedBlobName);
+
+            doc.setTargetLanguage(targetLanguage);
+            doc.setTranslatedFilename(translatedFile.getName());
+            doc.setTranslatedStoragePath(translatedBlobUrl);
+            documentService.updateDocument(doc);
+
+            return ResponseEntity.ok(DocumentDTO.from(doc));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
     private String getExtension(String mime, String filename) {
         if (!"application/octet-stream".equals(mime)) {

@@ -1,4 +1,4 @@
-package pl.pwr.Neuralingo.translation.pdf;
+package pl.pwr.Neuralingo.translation.file.pdf;
 
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;

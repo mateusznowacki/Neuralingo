@@ -1,4 +1,4 @@
-package pl.pwr.Neuralingo.translation.vsdx;
+package pl.pwr.Neuralingo.translation.file.vsdx;
 
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;

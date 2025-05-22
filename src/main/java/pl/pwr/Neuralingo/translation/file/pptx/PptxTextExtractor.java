@@ -1,4 +1,4 @@
-package pl.pwr.Neuralingo.translation.pptx;
+package pl.pwr.Neuralingo.translation.file.pptx;
 
 import org.apache.poi.xslf.usermodel.*;
 import org.springframework.stereotype.Component;
