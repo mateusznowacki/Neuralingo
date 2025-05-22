@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 
+import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -35,9 +36,17 @@ public class PptxTextExtractor {
 
     private void extractTextFromShape(XSLFShape shape, List<Paragraph> paragraphs, int[] index, int slideIndex) {
         if (shape instanceof XSLFTextShape textShape) {
-            String text = textShape.getText();
-            if (text != null && !text.isBlank()) {
-                paragraphs.add(new Paragraph(index[0]++, text.trim(), slideIndex, 0, 0));
+            Rectangle2D anchor = textShape.getAnchor();
+            for (XSLFTextParagraph para : textShape.getTextParagraphs()) {
+                for (XSLFTextRun run : para.getTextRuns()) {
+                    String runText = run.getRawText();
+                    if (runText != null && !runText.trim().isEmpty()) {
+                        System.out.printf("Slide %d | Index %d | Text: \"%s\" | Pos: x=%.2f y=%.2f%n",
+                                slideIndex, index[0], runText.trim(), anchor.getX(), anchor.getY());
+                        paragraphs.add(new Paragraph(index[0]++, runText.trim(), slideIndex,
+                                (int) anchor.getX(), (int) anchor.getY()));
+                    }
+                }
             }
         } else if (shape instanceof XSLFGroupShape group) {
             for (XSLFShape inner : group.getShapes()) {
@@ -49,6 +58,9 @@ public class PptxTextExtractor {
                     extractTextFromShape(cell, paragraphs, index, slideIndex);
                 }
             }
+        } else {
+            // Dodaj log, jeśli pojawia się coś nietekstowego
+            System.out.println("Unknown shape: " + shape.getClass().getSimpleName());
         }
     }
 }

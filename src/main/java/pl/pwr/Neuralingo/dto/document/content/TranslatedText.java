@@ -13,4 +13,13 @@ public class TranslatedText {
     public List<Paragraph> getParagraphs() {
         return paragraphs;
     }
+
+
+    public Paragraph getByIndex(int index) {
+        return paragraphs.stream()
+                .filter(p -> p.getIndex() == index)
+                .findFirst()
+                .orElse(null);
+    }
+
 }

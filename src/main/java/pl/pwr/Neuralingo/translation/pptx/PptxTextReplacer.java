@@ -1,72 +1,89 @@
 package pl.pwr.Neuralingo.translation.pptx;
 
-import org.apache.poi.xslf.usermodel.*;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 @Component
 public class PptxTextReplacer {
 
     public File replaceText(File originalFile, ExtractedText original, TranslatedText translated) throws IOException {
-        Map<Integer, String> translationMap = translated.getParagraphs().stream()
-                .collect(Collectors.toMap(Paragraph::getIndex, Paragraph::getText));
+        File resultFile = new File(originalFile.getParent(), "translated_" + originalFile.getName());
 
-        String outputPath = originalFile.getAbsolutePath().replace(".pptx", "") + "_translated.pptx";
-        File outputFile = new File(outputPath);
+        try (ZipFile zipFile = new ZipFile(originalFile);
+             ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(resultFile))) {
 
-        try (FileInputStream fis = new FileInputStream(originalFile);
-             XMLSlideShow ppt = new XMLSlideShow(fis)) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
-            int[] index = {0};
-            for (XSLFSlide slide : ppt.getSlides()) {
-                for (XSLFShape shape : slide.getShapes()) {
-                    applyTranslationToShape(shape, translationMap, index);
-                }
-            }
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                InputStream is = zipFile.getInputStream(entry);
+                byte[] data;
 
-            try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-                ppt.write(fos);
-            }
-        }
+                if (entry.getName().startsWith("ppt/slides/slide") && entry.getName().endsWith(".xml")) {
+                    String xml = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 
-        return outputFile;
-    }
+                    List<Paragraph> originalParagraphs = original.getParagraphs();
+                    List<Paragraph> translatedParagraphs = translated.getParagraphs();
 
-    private void applyTranslationToShape(XSLFShape shape, Map<Integer, String> translationMap, int[] index) {
-        if (shape instanceof XSLFTextShape textShape) {
-            if (translationMap.containsKey(index[0])) {
-                String newText = translationMap.get(index[0]);
-                if (!textShape.getTextParagraphs().isEmpty()) {
-                    XSLFTextParagraph para = textShape.getTextParagraphs().get(0);
-                    if (!para.getTextRuns().isEmpty()) {
-                        para.getTextRuns().get(0).setText(newText);
-                    } else {
-                        para.addNewTextRun().setText(newText);
+                    for (int i = 0; i < Math.min(originalParagraphs.size(), translatedParagraphs.size()); i++) {
+                        String originalText = originalParagraphs.get(i).getText();
+                        String translatedText = translatedParagraphs.get(i).getText().trim();
+
+                        if (originalText == null || originalText.trim().isEmpty() || translatedText.isEmpty())
+                            continue;
+
+                        String escapedOriginal = Pattern.quote(originalText.trim());
+                        Pattern pattern = Pattern.compile(">(\\s*)(" + escapedOriginal + ")(\\s*)<");
+                        Matcher matcher = pattern.matcher(xml);
+
+                        if (matcher.find()) {
+                            int end = matcher.end();
+
+                            // Sprawdzenie tylko końca – czy po dopasowaniu nie ma spacji ani znacznika
+                            boolean needsTrailingSpace = false;
+                            if (end < xml.length()) {
+                                char nextChar = xml.charAt(end);
+                                if (nextChar != '<' && nextChar != ' ') {
+                                    needsTrailingSpace = true;
+                                }
+                            }
+
+                            if ((originalText.endsWith(" ") && !translatedText.endsWith(" ")) || needsTrailingSpace) {
+                                translatedText += " ";
+                            }
+
+                            String replacement = ">" + Matcher.quoteReplacement(translatedText) + "<";
+                            xml = matcher.replaceFirst(replacement);
+                        }
                     }
+
+                    data = xml.getBytes(StandardCharsets.UTF_8);
                 } else {
-                    textShape.setText(newText);
-                }
+                    data = is.readAllBytes();
             }
-            index[0]++;
-        } else if (shape instanceof XSLFGroupShape group) {
-            for (XSLFShape inner : group.getShapes()) {
-                applyTranslationToShape(inner, translationMap, index);
-            }
-        } else if (shape instanceof XSLFTable table) {
-            for (XSLFTableRow row : table.getRows()) {
-                for (XSLFTableCell cell : row.getCells()) {
-                    applyTranslationToShape(cell, translationMap, index);
-                }
-            }
+
+                zos.putNextEntry(new ZipEntry(entry.getName()));
+                zos.write(data);
+                zos.closeEntry();
         }
     }
+
+        return resultFile;
+}
+
 }

@@ -66,26 +66,4 @@ public class PdfContentExtractor {
     }
 
 
-
-    private String extractVisibleTextOnly(String html) {
-        StringBuilder sb = new StringBuilder();
-        boolean insideTag = false;
-
-        for (int i = 0; i < html.length(); i++) {
-            char c = html.charAt(i);
-
-            if (c == '<') {
-                insideTag = true;
-            } else if (c == '>') {
-                insideTag = false;
-            } else if (!insideTag) {
-                sb.append(c);
-            }
-        }
-
-        return sb.toString().replace('\u00A0', ' ').replaceAll(" +", " ");
-    }
-
-
-
 }
