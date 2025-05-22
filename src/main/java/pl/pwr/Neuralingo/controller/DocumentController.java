@@ -7,7 +7,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.entity.DocumentEntity;
 import pl.pwr.Neuralingo.service.AzureBlobService;
@@ -67,6 +66,27 @@ public class DocumentController {
 
         DocumentEntity doc = docOpt.get();
         byte[] content = azureBlobService.downloadFile(doc.getId());
+        if (content == null) {
+            return ResponseEntity.status(404).build();
+        }
+        String filename = doc.getOriginalFilename();
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(doc.getFileType()))
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .body(content);
+    }
+
+    @GetMapping("/download/translated/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> downloadTranslatedDocument(@PathVariable String id, Authentication authentication) {
+        Optional<DocumentEntity> docOpt = documentService.getEntityById(id, authentication);
+        if (docOpt.isEmpty()) {
+            return ResponseEntity.status(403).build();
+        }
+
+        DocumentEntity doc = docOpt.get();
+        byte[] content = azureBlobService.downloadFile(doc.getId() + "_translated");
         if (content == null) {
             return ResponseEntity.status(404).build();
         }
