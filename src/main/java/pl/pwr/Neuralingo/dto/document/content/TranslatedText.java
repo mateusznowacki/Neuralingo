@@ -22,4 +22,10 @@ public class TranslatedText {
                 .orElse(null);
     }
 
+    @Override
+    public String toString() {
+        return "TranslatedText{" +
+                "paragraphs=" + paragraphs +
+                '}';
+    }
 }

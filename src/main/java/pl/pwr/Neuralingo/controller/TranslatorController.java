@@ -49,24 +49,20 @@ public class TranslatorController {
 
         try {
             DocumentEntity doc = docOpt.get();
-            String extension = getExtensionFromMime(doc.getFileType());
+            String extension = getExtension(doc.getFileType(), doc.getOriginalFilename());
 
-            // 1. Download blob to temp directory without extension, then rename
             String rawPath = azureBlobService.downloadLocal(id);
             Path originalPath = Path.of(rawPath);
             Path renamedPath = Path.of(rawPath + "." + extension);
             Files.move(originalPath, renamedPath, StandardCopyOption.REPLACE_EXISTING);
 
-            // 2. Translate document
             File inputFile = renamedPath.toFile();
             String translatedPath = docTranslator.translateDocument(inputFile, targetLanguage);
 
-            // 3. Upload translated file back without extension
             File translatedFile = new File(translatedPath);
             String translatedBlobName = id + "_translated";
             String translatedBlobUrl = azureBlobService.uploadFile(translatedFile, translatedBlobName);
 
-            // 4. Update document metadata
             doc.setTargetLanguage(targetLanguage);
             doc.setTranslatedFilename(translatedFile.getName());
             doc.setTranslatedStoragePath(translatedBlobUrl);
@@ -103,6 +99,21 @@ public class TranslatorController {
 //        }
 //    }
 
+
+    private String getExtension(String mime, String filename) {
+        if (!"application/octet-stream".equals(mime)) {
+            return getExtensionFromMime(mime);
+        }
+
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex != -1 && dotIndex < filename.length() - 1) {
+            return filename.substring(dotIndex + 1).toLowerCase();
+        }
+
+        return "bin";
+    }
+
+
     private String getExtensionFromMime(String mime) {
         return switch (mime) {
             case "application/pdf" -> "pdf";
@@ -112,10 +123,14 @@ public class TranslatorController {
             case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx";
             case "application/vnd.ms-powerpoint" -> "ppt";
             case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx";
-            case "application/vnd.visio" -> "vsd";
+            case "application/vnd.visio",
+                 "application/vnd.ms-visio.drawing" -> "vsd";
             case "application/vnd.ms-visio.drawing.main+xml" -> "vsdx";
             case "text/plain" -> "txt";
+            case "application/zip",
+                 "application/x-zip-compressed" -> "zip";
             default -> "bin";
         };
     }
+
 }

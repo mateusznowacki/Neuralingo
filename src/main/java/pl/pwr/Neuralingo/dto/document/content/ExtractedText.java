@@ -13,5 +13,12 @@ public class ExtractedText {
     public List<Paragraph> getParagraphs() {
         return paragraphs;
     }
+
+    @Override
+    public String toString() {
+        return "ExtractedText{" +
+                "paragraphs=" + paragraphs +
+                '}';
+    }
 }
 
