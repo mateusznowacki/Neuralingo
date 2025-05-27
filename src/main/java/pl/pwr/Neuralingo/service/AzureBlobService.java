@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
-
 import java.nio.file.Path;
 
 @Service
@@ -71,6 +70,19 @@ public class AzureBlobService {
         try {
             String relativePath = "resources/temp";
             File directory = new File(relativePath);
+
+            // Usuń wszystkie pliki z katalogu jeśli istnieje
+            if (directory.exists()) {
+                File[] files = directory.listFiles();
+                if (files != null) {
+                    for (File file : files) {
+                        if (!file.delete()) {
+                            System.err.println("❗ Nie udało się usunąć pliku: " + file.getName());
+                        }
+                    }
+                }
+            }
+
             if (!directory.exists() && !directory.mkdirs()) {
                 throw new RuntimeException("Nie można utworzyć katalogu: " + relativePath);
             }

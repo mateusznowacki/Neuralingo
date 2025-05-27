@@ -49,6 +49,7 @@ public class TranslatorController {
             String extension = getExtension(doc.getFileType(), doc.getOriginalFilename());
 
             String rawPath = azureBlobService.downloadLocal(id);
+
             Path originalPath = Path.of(rawPath);
             Path renamedPath = Path.of(rawPath + "." + extension);
             Files.move(originalPath, renamedPath, StandardCopyOption.REPLACE_EXISTING);

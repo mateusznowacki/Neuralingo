@@ -1,62 +1,34 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
+#!/usr/bin/env node
 const path = require('path');
-const os = require('os');
+const puppeteer = require('puppeteer');
 
 (async () => {
-    const [, , htmlPath, targetPdfPath] = process.argv;
+  const [, , htmlPath, pdfPath] = process.argv;
+  if (!htmlPath || !pdfPath) {
+    console.error('❌  Użycie: node html2pdf.js input.html output.pdf');
+    process.exit(1);
+  }
 
-    if (!htmlPath || !targetPdfPath) {
-        console.error("❌ Usage: node html2pdf.js input.html output.pdf");
-        process.exit(1);
-    }
-
-    const absoluteHtmlPath = 'file://' + path.resolve(htmlPath);
-    const downloadsDir = path.join(os.homedir(), 'Downloads');
-
-    const browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-            '--kiosk-printing',
-            '--no-sandbox'
-        ]
-    });
-
+  const browser = await puppeteer.launch({headless: 'new', args: ['--no-sandbox']});
+  try {
     const page = await browser.newPage();
-    await page.goto(absoluteHtmlPath, {waitUntil: 'networkidle0'});
 
-    // Wywołaj drukowanie
-    await page.evaluate(() => window.print());
+    // tryb „print” – identyczny zestaw CSS co w oknie drukowania
+    await page.emulateMediaType('print');
 
-    // Czekaj aż plik się zapisze
-    let downloadedFile = null;
+    // ładowanie dokumentu i oczekiwanie na sieć + gotowe fonty
+    await page.goto('file://' + path.resolve(htmlPath), {waitUntil: 'networkidle0'});
+    await page.evaluateHandle('document.fonts.ready');
 
-    for (let i = 0; i < 20; i++) {
-        const pdfFiles = fs.readdirSync(downloadsDir)
-            .filter(f => f.endsWith('.pdf'))
-            .map(f => ({
-                name: f,
-                fullPath: path.join(downloadsDir, f),
-                time: fs.statSync(path.join(downloadsDir, f)).mtime.getTime()
-            }))
-            .sort((a, b) => b.time - a.time);
-
-        if (pdfFiles.length > 0) {
-            downloadedFile = pdfFiles[0].fullPath;
-            break;
-        }
-
-        await new Promise(res => setTimeout(res, 500));
-    }
-
+    // zapis do PDF-a; preferCSSPageSize – kluczowe, żeby nie skalować przez viewport
+    await page.pdf({
+      path: path.resolve(pdfPath),
+      printBackground: true,
+      preferCSSPageSize: true, // zostaw rozmiar stron drukarce
+      margin: {top: 0, bottom: 0, left: 0, right: 0}, // zero dodatkowych marginesów
+      scale: 1 // bez niepotrzebnego zmniejszania
+    });
+  } finally {
     await browser.close();
-
-    if (!downloadedFile || !fs.existsSync(downloadedFile)) {
-        console.error("❌ PDF not found in Downloads.");
-        process.exit(1);
-    }
-
-    // Skopiuj PDF do targetu
-    fs.copyFileSync(downloadedFile, targetPdfPath);
-    console.log(`✅ PDF copied to: ${targetPdfPath}`);
+  }
 })();

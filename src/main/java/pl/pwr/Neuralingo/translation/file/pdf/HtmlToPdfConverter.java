@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 
 @Component
 public class HtmlToPdfConverter {
@@ -15,42 +14,39 @@ public class HtmlToPdfConverter {
     private final Path scriptsDir = Paths.get("scripts");
 
     public File convertHtmlToPdf(String htmlContent, File outputPdfFile) throws IOException, InterruptedException {
-        // 1. Utwórz tymczasowy plik HTML
-        String baseName = outputPdfFile.getName().replaceAll("_translated\\.pdf$", "_translated.html");
-        Path tempHtmlPath = scriptsDir.resolve(baseName);
+        // 1. Utwórz tymczasowy plik HTML w tym samym katalogu co wynikowy PDF
+        Path tempHtmlPath = outputPdfFile.toPath().resolveSibling(
+                outputPdfFile.getName().replaceAll("\\.pdf$", ".html")
+        );
         Files.writeString(tempHtmlPath, htmlContent, StandardCharsets.UTF_8);
 
-        // 2. Wyjściowy PDF w tym samym katalogu
-        Path generatedPdfPath = scriptsDir.resolve(baseName.replaceAll("\\.html$", ".pdf"));
-
-        // 3. Wywołaj Puppeteera (html2pdf.js)
+        // 2. Uruchom Puppeteer z node.js
         ProcessBuilder pb = new ProcessBuilder(
                 "node",
                 "html2pdf.js",
                 tempHtmlPath.toAbsolutePath().toString(),
-                generatedPdfPath.toAbsolutePath().toString()
+                outputPdfFile.getAbsolutePath()
         );
-
         pb.directory(scriptsDir.toFile());
         pb.redirectErrorStream(true);
 
         Process process = pb.start();
-
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             reader.lines().forEach(System.out::println);
         }
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new IOException("❌ Puppeteer PDF generation failed, exit code: " + exitCode);
+            throw new IOException("❌ Puppeteer failed, exit code: " + exitCode);
         }
 
-        if (!Files.exists(generatedPdfPath)) {
-            throw new FileNotFoundException("❌ Nie znaleziono PDF: " + generatedPdfPath);
+        if (!Files.exists(outputPdfFile.toPath())) {
+            throw new FileNotFoundException("❌ PDF not created at: " + outputPdfFile);
         }
 
-        // 4. Kopiuj PDF do miejsca docelowego
-        Files.copy(generatedPdfPath, outputPdfFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        // 3. Usuń plik tymczasowy
+        Files.deleteIfExists(tempHtmlPath);
+
         return outputPdfFile;
     }
 }
