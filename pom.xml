@@ -10,7 +10,7 @@
     </parent>
     <groupId>pl.pwr</groupId>
     <artifactId>Neuralingo</artifactId>
-    <version>1/</version>
+    <version>1.0.0/</version>
     <name>Neuralingo</name>
     <description>AI documents translation</description>
     <url/>
