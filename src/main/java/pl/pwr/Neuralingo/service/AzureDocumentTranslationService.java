@@ -60,7 +60,7 @@ public class AzureDocumentTranslationService {
         return text.trim().matches(".*[\\p{L}].*");
     }
 
-    private List<String> translateBatch(List<String> texts, String targetLanguage) {
+    List<String> translateBatch(List<String> texts, String targetLanguage) {
         if (texts.isEmpty()) return Collections.emptyList();
 
         try {
