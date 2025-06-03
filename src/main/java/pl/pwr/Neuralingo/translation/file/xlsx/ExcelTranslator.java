@@ -4,12 +4,13 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
+import pl.pwr.Neuralingo.translation.DocumentTranslator;
 
 import java.io.File;
 import java.io.IOException;
 
 @Component
-public class ExcelTranslator {
+public class ExcelTranslator implements DocumentTranslator {
 
     private final ExcelTextExtractor extractor;
     private final ExcelTextReplacer replacer;
@@ -21,12 +22,13 @@ public class ExcelTranslator {
         this.azure = azure;
     }
 
-    public String translateExcelDocument(File inputFile, String targetLanguage) throws IOException {
+
+    @Override
+    public String translateDocument(File inputFile, String targetLanguage) throws IOException {
         ExtractedText extractedText = extractor.extractText(inputFile);
         TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
         File outputFile = replacer.replaceText(inputFile, extractedText, translatedText);
         return outputFile.getAbsolutePath();
     }
-
 }
 

@@ -5,12 +5,13 @@ import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentIntelligenceService;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
+import pl.pwr.Neuralingo.translation.DocumentTranslator;
 
 import java.io.File;
 import java.io.IOException;
 
 @Component
-public class WordOcrTranslator {
+public class WordOcrTranslator implements DocumentTranslator {
 
     private final AzureDocumentTranslationService azureTranslator;
     private final WordDocumentRebuilder wordDocumentRebuilder;
@@ -26,8 +27,8 @@ public class WordOcrTranslator {
         this.azureIntelligence = azureIntelligence;
     }
 
-
-    public String translateOcrWordDocument(File inputFile, String targetLanguage) throws IOException {
+    @Override
+    public String translateDocument(File inputFile, String targetLanguage) throws IOException {
         ExtractedText extractedText = wordLayoutExtractor.extractText(inputFile);
         TranslatedText translatedText = azureTranslator.translate(extractedText, targetLanguage);
 
@@ -39,4 +40,6 @@ public class WordOcrTranslator {
 
         return outputFile.getAbsolutePath();
     }
+
+
 }

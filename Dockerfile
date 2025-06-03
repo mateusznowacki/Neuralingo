@@ -1,58 +1,52 @@
-FROM debian:bookworm
+# Etap 1: Budowanie aplikacji Spring Boot
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
 
-# Ustaw środowisko
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Zainstaluj zależności systemowe, JDK, Maven, Node.js i Puppeteer dependencies
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jdk \
-    maven \
-    curl \
-    unzip \
-    fontconfig \
-    ca-certificates \
-    gnupg \
-    wget \
-    xfonts-base \
-    xfonts-75dpi \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libnss3 \
-    libxss1 \
-    libxshmfence1 \
-    libxext6 \
-    libxrender1 \
-    libxtst6 \
-    && apt-get clean
-
-# Zainstaluj Node.js LTS
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs
-
-# Ustaw katalog roboczy
 WORKDIR /app
 
-# Skopiuj projekt
 COPY pom.xml .
 COPY src ./src
-COPY lib/pdf2htmlEX.deb ./pdf2htmlEX.deb
-COPY scripts /app/scripts
 
-# Zainstaluj pdf2htmlEX
-RUN dpkg -i ./pdf2htmlEX.deb || apt-get install -f -y
-
-# Zainstaluj puppeteer i inne zależności
-WORKDIR /app/scripts
-RUN npm install
-
-# Buduj aplikację
-WORKDIR /app
 RUN mvn clean package -DskipTests
 
-# Finalny ENTRYPOINT
-CMD ["java", "-jar", "target/Neuralingo-1.jar"]
+# Etap 2: Obraz produkcyjny
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+EXPOSE 8080
+
+# --- Instalacja zależności systemowych ---
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    ca-certificates \
+    libfontconfig1 \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libopenjp2-7 \
+    xfonts-base \
+    xfonts-75dpi \
+    --no-install-recommends
+
+# --- Instalacja Node.js LTS + Puppeteer dependencies ---
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm && \
+    npm install -g puppeteer
+
+# --- Instalacja pdf2htmlEX z pliku .deb ---
+COPY lib/pdf2htmlEX.deb .
+RUN dpkg -i pdf2htmlEX.deb || apt-get install -f -y
+
+# --- Dodanie aplikacji + skryptów ---
+COPY --from=builder /app/target/*.jar Neuralingo.jar
+COPY scripts/package.json .
+COPY scripts/package-lock.json .
+COPY scripts/html2pdf.js .
+
+# Instalacja lokalnych zależności Node.js
+RUN npm install
+
+# Ustawienie domyślnej komendy
+CMD ["java", "-jar", "Neuralingo.jar"]

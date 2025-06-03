@@ -4,12 +4,13 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
+import pl.pwr.Neuralingo.translation.DocumentTranslator;
 
 import java.io.File;
 import java.io.IOException;
 
 @Component
-public class PdfTranslator {
+public class PdfTranslator implements DocumentTranslator {
 
     private final PdfContentExtractor contentExtractor;
     private final HtmlLayoutParser layoutParser;
@@ -29,32 +30,33 @@ public class PdfTranslator {
         this.azure = azure;
     }
 
-    public String translatePdfDocument(File pdfFile, String targetLanguage) throws IOException {
+    @Override
+    public String translateDocument(File inputFile, String targetLanguage) throws IOException {
         try {
             // 1. Konwersja PDF → HTML jako String (pdf2htmlEX)
-            String htmlContent = contentExtractor.extractLayout(pdfFile);
+            String htmlContent = contentExtractor.extractLayout(inputFile);
 
-        // 2. Przebuduj HTML (scalenie wyrazów, stylizacja itp.)
-        String structuredHtml = layoutParser.buildStructuredHtml(htmlContent);
+            // 2. Przebuduj HTML (scalenie wyrazów, stylizacja itp.)
+            String structuredHtml = layoutParser.buildStructuredHtml(htmlContent);
 
             // 3. Ekstrakcja tekstu do tłumaczenia (z HTML-a jako string)
-        ExtractedText extractedText = contentExtractor.extractText(structuredHtml);
+            ExtractedText extractedText = contentExtractor.extractText(structuredHtml);
 
             // 4. Tłumaczenie tekstu
-        TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
+            TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
 
             // 5. Podmiana tekstu w HTML
-        String translatedHtml = textReplacer.replaceText(structuredHtml, extractedText, translatedText);
+            String translatedHtml = textReplacer.replaceText(structuredHtml, extractedText, translatedText);
 
             // 6. Generowanie końcowego PDF-a
-        File translatedPdfFile = new File(
-                pdfFile.getParentFile(),
-                pdfFile.getName().replaceFirst("(?i)\\.pdf$", "_translated.pdf")
-        );
+            File translatedinputFile = new File(
+                    inputFile.getParentFile(),
+                    inputFile.getName().replaceFirst("(?i)\\.pdf$", "_translated.pdf")
+            );
 
             File generatedPdf = pdfConverter.convertHtmlToPdf(
                     translatedHtml,
-                    translatedPdfFile
+                    translatedinputFile
             );
 
             return generatedPdf.getAbsolutePath();
@@ -64,5 +66,8 @@ public class PdfTranslator {
         }
     }
 
-
 }
+
+   
+       
+    

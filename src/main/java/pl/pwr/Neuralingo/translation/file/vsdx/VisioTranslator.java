@@ -4,12 +4,13 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
+import pl.pwr.Neuralingo.translation.DocumentTranslator;
 
 import java.io.File;
 import java.io.IOException;
 
 @Component
-public class VisioTranslator {
+public class VisioTranslator implements DocumentTranslator {
 
     private final VisioTextExtractor extractor;
     private final VisioTextReplacer replacer;
@@ -21,8 +22,8 @@ public class VisioTranslator {
         this.azure = azure;
     }
 
-    public String translateVisioDocument(File file, String targetLanguage) throws IOException {
-
+    @Override
+    public String translateDocument(File file, String targetLanguage) throws IOException {
         ExtractedText extracted = extractor.extractText(file);
         System.out.println(extracted.toString());
         TranslatedText translated = azure.translate(extracted, targetLanguage);

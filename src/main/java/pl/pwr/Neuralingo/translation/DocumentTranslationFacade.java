@@ -37,15 +37,15 @@ public class DocumentTranslationFacade {
         String fileName = file.getName().toLowerCase();
 
         if (fileName.endsWith(".docx")) {
-            return wordTranslator.translateWordDocument(file, targetLanguage);
+            return wordTranslator.translateDocument(file, targetLanguage);
         } else if (fileName.endsWith(".pdf")) {
-            return pdfTranslator.translatePdfDocument(file, targetLanguage);
+            return pdfTranslator.translateDocument(file, targetLanguage);
         } else if (fileName.endsWith(".pptx")) {
-            return pptxTranslator.translatePptxDocument(file, targetLanguage);
+            return pptxTranslator.translateDocument(file, targetLanguage);
         } else if (fileName.endsWith(".xlsx")) {
-            return excelTranslator.translateExcelDocument(file, targetLanguage);
+            return excelTranslator.translateDocument(file, targetLanguage);
         } else if (fileName.endsWith(".vsdx")) {
-            return visioTranslator.translateVisioDocument(file, targetLanguage);
+            return visioTranslator.translateDocument(file, targetLanguage);
         } else {
             throw new IllegalArgumentException("Nieobsługiwane rozszerzenie pliku: " + fileName);
         }
@@ -55,9 +55,9 @@ public class DocumentTranslationFacade {
         String fileName = file.getName().toLowerCase();
 
         if (fileName.endsWith(".docx")) {
-            return wordOcrTranslator.translateOcrWordDocument(file, targetLanguage);
+            return wordOcrTranslator.translateDocument(file, targetLanguage);
         } else if (fileName.endsWith(".pdf")) {
-            return pdfTranslator.translatePdfDocument(file, targetLanguage);
+            return pdfTranslator.translateDocument(file, targetLanguage);
         } else {
             throw new IllegalArgumentException("Nieobsługiwane rozszerzenie pliku: " + fileName);
         }

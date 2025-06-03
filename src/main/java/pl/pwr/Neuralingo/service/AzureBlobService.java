@@ -7,6 +7,7 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import pl.pwr.Neuralingo.NeuralingoApplication;
 
 import java.io.*;
 import java.nio.file.Path;
@@ -65,17 +66,20 @@ public class AzureBlobService {
         }
     }
 
-    // Pobranie i zapis lokalny do resources/temp
     public String downloadLocal(String blobName) {
         try {
+            // Ścieżka do katalogu, gdzie znajduje się uruchomiony plik JAR
+            String jarDir = new File(NeuralingoApplication.class.getProtectionDomain().getCodeSource().getLocation().toURI())
+                    .getParent();
+
             String relativePath = "resources/temp";
-            File directory = new File(relativePath);
+            File directory = new File(jarDir, relativePath);
 
             if (!directory.exists() && !directory.mkdirs()) {
-                throw new RuntimeException("Nie można utworzyć katalogu: " + relativePath);
+                throw new RuntimeException("Nie można utworzyć katalogu: " + directory.getAbsolutePath());
             }
 
-            Path localPath = Path.of(relativePath, blobName);
+            Path localPath = Path.of(directory.getAbsolutePath(), blobName);
             File localFile = localPath.toFile();
 
             BlobClient blobClient = containerClient.getBlobClient(blobName);
@@ -88,11 +92,11 @@ public class AzureBlobService {
             }
 
             return localFile.getAbsolutePath();
-
-        } catch (IOException e) {
-            throw new RuntimeException("Błąd zapisu pliku lokalnie: " + blobName, e);
+        } catch (Exception e) {
+            throw new RuntimeException("Błąd podczas pobierania pliku", e);
         }
     }
+
 
     // Usunięcie pliku z blob storage po nazwie
     public void deleteFile(String blobName) {

@@ -4,12 +4,13 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
+import pl.pwr.Neuralingo.translation.DocumentTranslator;
 
 import java.io.File;
 import java.io.IOException;
 
 @Component
-public class PptxTranslator {
+public class PptxTranslator implements DocumentTranslator {
 
     private final PptxTextExtractor extractor;
     private final PptxTextReplacer replacer;
@@ -21,7 +22,9 @@ public class PptxTranslator {
         this.azure = azure;
     }
 
-    public String translatePptxDocument(File file, String targetLanguage) throws IOException {
+
+    @Override
+    public String translateDocument(File file, String targetLanguage) throws IOException {
         ExtractedText extracted = extractor.extractText(file);
         TranslatedText translated = azure.translate(extracted, targetLanguage);
         File outputFile = replacer.replaceText(file, extracted, translated);

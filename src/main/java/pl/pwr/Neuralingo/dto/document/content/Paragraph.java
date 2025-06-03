@@ -9,6 +9,28 @@ public class Paragraph {
     private int rowIndex;
     private int columnIndex;
     private Integer slideIndex;
+    private int pageIndex;
+    private float x;
+    private float y;
+    private float width;
+    private float height;
+    private String font;
+
+
+    public Paragraph(String text, int sheetIndex, int rowIndex, int columnIndex, Integer slideIndex, int pageIndex, float x, float y, float width, float height, String font, int index) {
+        this.text = text;
+        this.sheetIndex = sheetIndex;
+        this.rowIndex = rowIndex;
+        this.columnIndex = columnIndex;
+        this.slideIndex = slideIndex;
+        this.pageIndex = pageIndex;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.font = font;
+        this.index = index;
+    }
 
     public Paragraph(int index, String text) {
         this.index = index;
@@ -54,6 +76,30 @@ public class Paragraph {
         return slideIndex;
     }
 
+
+    public int getPageIndex() {
+        return pageIndex;
+    }
+
+    public float getX() {
+        return x;
+    }
+
+    public float getY() {
+        return y;
+    }
+
+    public float getWidth() {
+        return width;
+    }
+
+    public float getHeight() {
+        return height;
+    }
+
+    public String getFont() {
+        return font;
+    }
 }
 
 

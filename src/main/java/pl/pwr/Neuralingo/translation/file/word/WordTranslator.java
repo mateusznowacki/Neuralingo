@@ -4,12 +4,13 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.TranslatedText;
 import pl.pwr.Neuralingo.service.AzureDocumentTranslationService;
+import pl.pwr.Neuralingo.translation.DocumentTranslator;
 
 import java.io.File;
 import java.io.IOException;
 
 @Component
-public class WordTranslator {
+public class WordTranslator implements DocumentTranslator {
 
     private final WordTextExtractor wordTextExtractor;
     private final WordTextReplacer wordTextReplacer;
@@ -22,7 +23,8 @@ public class WordTranslator {
         this.azure = azure;
     }
 
-    public String translateWordDocument(File inputFile, String targetLanguage) throws IOException {
+    @Override
+    public String translateDocument(File inputFile, String targetLanguage) throws IOException {
         ExtractedText extractedText = wordTextExtractor.extractText(inputFile);
         TranslatedText translatedText = azure.translate(extractedText, targetLanguage);
 
