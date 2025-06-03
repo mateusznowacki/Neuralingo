@@ -1,6 +1,7 @@
 package pl.pwr.Neuralingo.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -87,12 +88,9 @@ public class DocumentService {
 
     public Optional<DocumentEntity> getEntityById(String id, Authentication authentication) {
         Optional<DocumentEntity> docOpt = documentRepository.findById(id);
-
-        // Jeśli dokument nie istnieje lub nie należy do użytkownika – zwróć pusty Optional
         if (docOpt.isEmpty() || !docOpt.get().getOwnerId().equals(authentication.getName())) {
             return Optional.empty();
         }
-
         return docOpt;
     }
 
@@ -100,4 +98,39 @@ public class DocumentService {
         documentRepository.save(doc);
     }
 
+    public ResponseEntity<byte[]> downloadDocument(String id, Authentication auth) {
+        Optional<DocumentEntity> docOpt = getEntityById(id, auth);
+        if (docOpt.isEmpty()) {
+            return ResponseEntity.status(403).build();
+        }
+
+        DocumentEntity doc = docOpt.get();
+        byte[] content = azureBlobService.downloadFile(doc.getId());
+        if (content == null) {
+            return ResponseEntity.status(404).build();
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(doc.getFileType()))
+                .header("Content-Disposition", "attachment; filename=\"" + doc.getOriginalFilename() + "\"")
+                .body(content);
+    }
+
+    public ResponseEntity<byte[]> downloadTranslatedDocument(String id, Authentication auth) {
+        Optional<DocumentEntity> docOpt = getEntityById(id, auth);
+        if (docOpt.isEmpty()) {
+            return ResponseEntity.status(403).build();
+        }
+
+        DocumentEntity doc = docOpt.get();
+        byte[] content = azureBlobService.downloadFile(doc.getId() + "_translated");
+        if (content == null) {
+            return ResponseEntity.status(404).build();
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(doc.getFileType()))
+                .header("Content-Disposition", "attachment; filename=\"" + doc.getOriginalFilename() + "\"")
+                .body(content);
+    }
 }
