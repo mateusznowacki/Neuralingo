@@ -1,10 +1,7 @@
 package pl.pwr.Neuralingo.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -34,7 +31,6 @@ public class AzureDocumentIntelligenceService {
     private static final String LAYOUT_MODEL = "prebuilt-layout";
     private static final String LAYOUT_API_VERSION = "2024-11-30";
 
-    private static final Logger logger = LoggerFactory.getLogger(AzureDocumentIntelligenceService.class);
 
     private HttpClient client;
 
@@ -51,9 +47,9 @@ public class AzureDocumentIntelligenceService {
             readFuture.get();
             layoutFuture.get();
 
-            logger.info("Oba modele zakończyły analizę i zapisano wyniki do plików.");
+
         } catch (Exception e) {
-            logger.error("Błąd podczas równoległej analizy dokumentu: {}", e.getMessage(), e);
+
             throw new RuntimeException("Błąd podczas przetwarzania dokumentu: " + e.getMessage(), e);
         }
     }
@@ -86,7 +82,7 @@ public class AzureDocumentIntelligenceService {
                 Files.createDirectories(outputPath.getParent());
                 Files.writeString(outputPath, root.toString(2), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-                logger.info("Zapisano JSON dla modelu {} do pliku: {}", model, outputPath);
+
                 return root;
 
             } catch (Exception e) {
@@ -107,7 +103,7 @@ public class AzureDocumentIntelligenceService {
             JSONObject result = new JSONObject(response.body());
 
             String status = result.optString("status");
-            logger.info("Status z modelu: {}", status);
+
 
             switch (status) {
                 case "succeeded" -> {
