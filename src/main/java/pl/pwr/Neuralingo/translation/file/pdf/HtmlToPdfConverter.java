@@ -13,7 +13,30 @@ import java.nio.file.Paths;
 @Component
 public class HtmlToPdfConverter {
 
-    private final Path scriptsDir = Paths.get(".");
+    private Path scriptsDir = Paths.get(".");
+
+
+    public HtmlToPdfConverter() {
+        if (isRunningInDocker()) {
+            System.out.println("✅ Wykryto środowisko Docker → ustawiam scriptsDir = /app");
+            scriptsDir = Paths.get(".");
+        } else {
+            System.out.println("✅ Wykryto środowisko lokalne → ustawiam scriptsDir = .");
+            scriptsDir = Paths.get("scripts");
+        }
+    }
+
+    private static boolean isRunningInDocker() {
+        try {
+            Path cgroupPath = Paths.get("/proc/1/cgroup");
+            if (Files.exists(cgroupPath)) {
+                String content = Files.readString(cgroupPath);
+                return content.contains("docker") || content.contains("kubepods");
+            }
+        } catch (IOException ignored) {
+        }
+        return false;
+    }
 
     public File convertHtmlToPdf(String htmlContent, File outputPdfFile) throws IOException, InterruptedException {
         // 1. Utwórz tymczasowy plik HTML w tym samym katalogu co wynikowy PDF
