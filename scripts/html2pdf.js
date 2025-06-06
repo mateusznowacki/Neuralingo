@@ -15,7 +15,6 @@ const puppeteer = require('puppeteer');
 
     // tryb „print” – identyczny zestaw CSS co w oknie drukowania
     await page.emulateMediaType('print');
-
     // ładowanie dokumentu i oczekiwanie na sieć + gotowe fonty
     await page.goto('file://' + path.resolve(htmlPath), {waitUntil: 'networkidle0'});
     await page.evaluateHandle('document.fonts.ready');

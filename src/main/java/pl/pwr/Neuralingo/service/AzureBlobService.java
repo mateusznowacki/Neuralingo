@@ -7,7 +7,6 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import pl.pwr.Neuralingo.NeuralingoApplication;
 
 import java.io.*;
 import java.nio.file.Path;
@@ -29,11 +28,6 @@ public class AzureBlobService {
         if (!this.containerClient.exists()) {
             this.containerClient.create();
         }
-    }
-
-    // constructor for testing only
-    public AzureBlobService(BlobContainerClient containerClient) {
-        this.containerClient = containerClient;
     }
 
 
@@ -74,12 +68,10 @@ public class AzureBlobService {
 
     public String downloadLocal(String blobName) {
         try {
-            // Ścieżka do katalogu, gdzie znajduje się uruchomiony plik JAR
-            String jarDir = new File(NeuralingoApplication.class.getProtectionDomain().getCodeSource().getLocation().toURI())
-                    .getParent();
+            // używamy bezpiecznego katalogu tymczasowego
+            String tmpDir = System.getProperty("java.io.tmpdir");
 
-            String relativePath = "resources/temp";
-            File directory = new File(jarDir, relativePath);
+            File directory = new File(tmpDir, "neuralingo-temp");
 
             if (!directory.exists() && !directory.mkdirs()) {
                 throw new RuntimeException("Nie można utworzyć katalogu: " + directory.getAbsolutePath());

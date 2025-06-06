@@ -4,8 +4,10 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,9 +41,28 @@ public class PdfContentExtractor {
         builder.redirectErrorStream(true);
         Process process = builder.start();
 
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("[pdf2htmlEX] " + line);
+            }
+        }
 
-        return new String(java.nio.file.Files.readAllBytes(htmlOutput.toPath()), StandardCharsets.UTF_8);
+        int exitCode = process.waitFor();
+
+        if (exitCode != 0) {
+            throw new IOException("❌ pdf2htmlEX failed with exit code " + exitCode);
     }
+
+        if (!htmlOutput.exists()) {
+            throw new IOException("❌ Expected HTML output file not found: " + htmlOutput.getAbsolutePath());
+        }
+
+        String htmlContent = new String(java.nio.file.Files.readAllBytes(htmlOutput.toPath()), StandardCharsets.UTF_8);
+
+        return htmlContent;
+    }
+
 
 
     public ExtractedText extractText(String htmlContent) {
@@ -64,6 +85,5 @@ public class PdfContentExtractor {
 
         return new ExtractedText(paragraphs);
     }
-
 
 }

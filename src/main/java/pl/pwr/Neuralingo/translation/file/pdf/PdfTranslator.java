@@ -53,12 +53,10 @@ public class PdfTranslator implements DocumentTranslator {
                     inputFile.getParentFile(),
                     inputFile.getName().replaceFirst("(?i)\\.pdf$", "_translated.pdf")
             );
-
             File generatedPdf = pdfConverter.convertHtmlToPdf(
                     translatedHtml,
                     translatedinputFile
             );
-
             return generatedPdf.getAbsolutePath();
 
         } catch (InterruptedException e) {

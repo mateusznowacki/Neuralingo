@@ -53,7 +53,6 @@ public class TranslationService {
             File translatedFile = new File(translatedPath);
             String translatedBlobName = id + "_translated";
             String translatedBlobUrl = azureBlobService.uploadFile(translatedFile, translatedBlobName);
-
             doc.setTargetLanguage(targetLanguage);
             doc.setTranslatedFilename(translatedFile.getName());
             doc.setTranslatedStoragePath(translatedBlobUrl);

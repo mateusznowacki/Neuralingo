@@ -2,7 +2,9 @@ package pl.pwr.Neuralingo.translation.file.pdf;
 
 import org.springframework.stereotype.Component;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,7 +13,7 @@ import java.nio.file.Paths;
 @Component
 public class HtmlToPdfConverter {
 
-    private final Path scriptsDir = Paths.get("scripts");
+    private final Path scriptsDir = Paths.get(".");
 
     public File convertHtmlToPdf(String htmlContent, File outputPdfFile) throws IOException, InterruptedException {
         // 1. Utwórz tymczasowy plik HTML w tym samym katalogu co wynikowy PDF
@@ -19,7 +21,6 @@ public class HtmlToPdfConverter {
                 outputPdfFile.getName().replaceAll("\\.pdf$", ".html")
         );
         Files.writeString(tempHtmlPath, htmlContent, StandardCharsets.UTF_8);
-
         // 2. Uruchom Puppeteer z node.js
         ProcessBuilder pb = new ProcessBuilder(
                 "node",
@@ -29,24 +30,18 @@ public class HtmlToPdfConverter {
         );
         pb.directory(scriptsDir.toFile());
         pb.redirectErrorStream(true);
-
         Process process = pb.start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            reader.lines().forEach(System.out::println);
-        }
-
         int exitCode = process.waitFor();
+
         if (exitCode != 0) {
             throw new IOException("❌ Puppeteer failed, exit code: " + exitCode);
         }
-
         if (!Files.exists(outputPdfFile.toPath())) {
             throw new FileNotFoundException("❌ PDF not created at: " + outputPdfFile);
         }
 
         // 3. Usuń plik tymczasowy
         Files.deleteIfExists(tempHtmlPath);
-
         return outputPdfFile;
     }
 }

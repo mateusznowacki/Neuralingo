@@ -6,7 +6,8 @@ WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 
-RUN mvn clean package -DskipTests
+RUN mvn clean package -Dmaven.test.skip=true
+
 
 # Etap 2: Obraz produkcyjny
 FROM eclipse-temurin:21-jdk
@@ -34,6 +35,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g npm && \
     npm install -g puppeteer
+
+# DODAJ TO TU:
+RUN apt-get update && apt-get install -y \
+    ca-certificates fonts-liberation libappindicator3-1 libasound2t64 \
+    libatk-bridge2.0-0 libatk1.0-0 libcups2 libdbus-1-3 libgdk-pixbuf2.0-0 \
+    libnspr4 libnss3 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 \
+    xdg-utils libu2f-udev libvulkan1 libgl1 libdrm2 libxfixes3 libxext6 libxrender1 \
+    --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
 
 # --- Instalacja pdf2htmlEX z pliku .deb ---
 COPY lib/pdf2htmlEX.deb .
