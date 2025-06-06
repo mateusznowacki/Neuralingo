@@ -31,6 +31,12 @@ public class AzureBlobService {
         }
     }
 
+    // constructor for testing only
+    public AzureBlobService(BlobContainerClient containerClient) {
+        this.containerClient = containerClient;
+    }
+
+
     // Upload z nazwą blobu (np. documentId)
     public String uploadFile(MultipartFile file, String blobName) {
         try {
