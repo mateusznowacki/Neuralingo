@@ -16,15 +16,15 @@ public class HtmlToPdfConverter {
     private Path scriptsDir = Paths.get(".");
 
 
-    public HtmlToPdfConverter() {
-        if (isRunningInDocker()) {
-            System.out.println("✅ Wykryto środowisko Docker → ustawiam scriptsDir = /app");
-            scriptsDir = Paths.get(".");
-        } else {
-            System.out.println("✅ Wykryto środowisko lokalne → ustawiam scriptsDir = .");
-            scriptsDir = Paths.get("scripts");
-        }
-    }
+//    public HtmlToPdfConverter() {
+//        if (isRunningInDocker()) {
+//            System.out.println("✅ Wykryto środowisko Docker → ustawiam scriptsDir = /app");
+//            scriptsDir = Paths.get(".");
+//        } else {
+//            System.out.println("✅ Wykryto środowisko lokalne → ustawiam scriptsDir = .");
+//            scriptsDir = Paths.get("scripts");
+//        }
+//    }
 
     private static boolean isRunningInDocker() {
         try {
