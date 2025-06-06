@@ -4,10 +4,8 @@ import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
 import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,12 +39,6 @@ public class PdfContentExtractor {
         builder.redirectErrorStream(true);
         Process process = builder.start();
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println("[pdf2htmlEX] " + line);
-            }
-        }
 
         int exitCode = process.waitFor();
 
