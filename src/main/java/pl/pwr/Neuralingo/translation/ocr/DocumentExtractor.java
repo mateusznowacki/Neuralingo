@@ -1,27 +1,17 @@
 package pl.pwr.Neuralingo.translation.ocr;
 
-import org.apache.pdfbox.contentstream.PDFStreamEngine;
-import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.cos.COSBase;
-import org.apache.pdfbox.cos.COSName;
-import org.apache.pdfbox.io.MemoryUsageSetting;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.graphics.PDXObject;
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import pl.pwr.Neuralingo.dto.document.content.ExtractedText;
+import pl.pwr.Neuralingo.dto.document.content.Paragraph;
 import pl.pwr.Neuralingo.service.AzureDocumentIntelligenceService;
 
-import javax.imageio.ImageIO;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Point2D;
-import java.awt.geom.Rectangle2D;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -33,6 +23,33 @@ public class DocumentExtractor {
     @Autowired
     private AzureDocumentIntelligenceService azure;
 
+    public ExtractedText extractText(String html) {
+        Document doc = Jsoup.parse(html);
+        List<Paragraph> paragraphs = new ArrayList<>();
+        int index = 0;
+
+        // Extract <div class="text">
+        Elements textDivs = doc.select("div.text");
+        for (Element textDiv : textDivs) {
+            String text = textDiv.text().trim();
+            if (!text.isEmpty()) {
+                paragraphs.add(new Paragraph(index++, text));
+            }
+        }
+
+        // Extract <div class="cell"> (for table cells)
+        Elements tableCells = doc.select("div.cell");
+        for (Element cell : tableCells) {
+            String text = cell.text().trim();
+            if (!text.isEmpty()) {
+                paragraphs.add(new Paragraph(index++, text));
+            }
+        }
+
+        return new ExtractedText(paragraphs);
+    }
+
+
     public String extractTextAsHtml(File inputFile) throws IOException {
 
         byte[] bytes = Files.readAllBytes(inputFile.toPath());
@@ -41,18 +58,12 @@ public class DocumentExtractor {
         Map<Integer, Style> styleMap = Style.build(
                 root.getJSONObject("analyzeResult").optJSONArray("styles"));
 
-        Map<Integer, List<ImageRec>> images =
-                inputFile.getName().toLowerCase().endsWith(".pdf")
-                        ? extractImagesFromPdf(inputFile)
-                        : Map.of();
-
         StringBuilder html = new StringBuilder("""
                 <!DOCTYPE html><html><head><meta charset="UTF-8">
                 <style>
                    body{background:#fff;margin:0}
                    .page{position:relative;border:1px solid #000;margin:20px auto}
                    .text{position:absolute;white-space:pre}
-                   .img{position:absolute;z-index:-100}
                    .tableWrap{position:absolute}
                    .table{display:grid;border:1px solid #000;border-collapse:collapse;width:100%;height:100%}
                    .cell{border:1px solid #888;padding:4px;white-space:pre}
@@ -69,14 +80,9 @@ public class DocumentExtractor {
             float pageHeightPx = (float) page.getDouble("height") * dpi;
             int pageNo = page.getInt("pageNumber");
 
-            html.append("<div class=\"page\" style=\"width:").append(pageWidthPx)
-                    .append("px;height:").append(pageHeightPx).append("px;\">");
-
-            /* obrazy */
-            for (ImageRec im : images.getOrDefault(pageNo, List.of()))
-                html.append(String.format(
-                        "<img class=\"img\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;\" src=\"data:image/png;base64,%s\"/>",
-                        im.x, im.y, im.w, im.h, im.b64));
+            html.append("<div class=\"page\" style=\"width:")
+                    .append(pageWidthPx).append("px;height:")
+                    .append(pageHeightPx).append("px;\">");
 
             /* tabele */
             if (tables != null)
@@ -88,8 +94,7 @@ public class DocumentExtractor {
                 }
 
             /* tekst */
-            renderWords(html, page, dpi, styleMap,
-                    tables, images.getOrDefault(pageNo, List.of()));
+            renderWords(html, page, dpi, styleMap, tables);
 
             html.append("</div>");
         }
@@ -98,11 +103,13 @@ public class DocumentExtractor {
         return html.toString();
     }
 
-    /*──────────────────────────── TEXT ────────────────────────────*/
+
+
+    /*────────────────────────── TEXT ──────────────────────────*/
 
     private void renderWords(StringBuilder html, JSONObject page, float dpi,
                              Map<Integer, Style> styleMap,
-                             JSONArray allTables, List<ImageRec> imgs) {
+                             JSONArray allTables) {
 
         JSONArray words = page.optJSONArray("words");
         if (words == null) return;
@@ -115,7 +122,6 @@ public class DocumentExtractor {
                         .getInt("pageNumber") == page.getInt("pageNumber"))
                     masks.add(new Box(tb.getJSONArray("boundingRegions").getJSONObject(0), dpi));
             }
-        imgs.forEach(im -> masks.add(new Box(im)));
 
         TreeMap<Float, List<JSONObject>> lines = new TreeMap<>();
         for (int i = 0; i < words.length(); i++) {
@@ -173,7 +179,7 @@ public class DocumentExtractor {
                 : -1;
     }
 
-    /*────────────────────────── TABLES ────────────────────────────*/
+    /*───────────────────────── TABLES ─────────────────────────*/
 
     private void renderTable(StringBuilder html, JSONObject tb, float dpi,
                              Map<Integer, Style> styleMap) {
@@ -182,7 +188,7 @@ public class DocumentExtractor {
         int cols = tb.getInt("columnCount");
 
         html.append(String.format(
-                "<div class=\"tableWrap\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;\">",
+                        "<div class=\"tableWrap\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;\">",
                         box.x, box.y, box.w, box.h))
                 .append("<div class=\"table\" style=\"grid-template-columns:repeat(")
                 .append(cols).append(",1fr);\">");
@@ -204,120 +210,7 @@ public class DocumentExtractor {
         html.append("</div></div>");
     }
 
-    /*───────────────────────── IMAGES ─────────────────────────────*/
-
-    private Map<Integer, List<ImageRec>> extractImagesFromPdf(File pdf) throws IOException {
-
-        try (PDDocument doc = PDDocument.load(pdf, MemoryUsageSetting.setupTempFileOnly())) {
-
-            Map<Integer, List<ImageRec>> map = new HashMap<>();
-            int pageNo = 1;
-            float pxPerPt = 96f / 72f;
-            Base64.Encoder base64 = Base64.getEncoder();
-
-            for (PDPage page : doc.getPages()) {
-
-                PDRectangle crop = page.getCropBox();
-                float pageHeightPx = crop.getHeight() * pxPerPt;
-
-                ImageCollector collector = new ImageCollector();
-                collector.processPage(page);
-
-                List<ImageRec> list = new ArrayList<>();
-                for (ImageCollector.Rec rec : collector.images) {
-
-                    double adjX = rec.bounds.getMinX() - crop.getLowerLeftX();
-                    double adjY = rec.bounds.getMinY() - crop.getLowerLeftY();
-
-                    float xPx = (float) adjX * pxPerPt;
-                    float yPx = pageHeightPx - (float) (rec.bounds.getMaxY() - crop.getLowerLeftY()) * pxPerPt;
-                    float wPx = (float) rec.bounds.getWidth() * pxPerPt;
-                    float hPx = (float) rec.bounds.getHeight() * pxPerPt;
-
-                    if (xPx + wPx > crop.getWidth() * pxPerPt) {
-                        float ratio = (crop.getWidth() * pxPerPt - xPx) / wPx;
-                        wPx *= ratio;
-                        hPx *= ratio;
-                    }
-                    list.add(new ImageRec(xPx, yPx, wPx, hPx,
-                            base64.encodeToString(rec.png)));
-                }
-                map.put(pageNo++, list);
-            }
-            return map;
-        }
-    }
-
-    private static class ImageCollector extends PDFStreamEngine {
-
-        private static class Rec {
-            final Rectangle2D bounds;
-            final byte[] png;
-
-            Rec(Rectangle2D b, byte[] p) {
-                bounds = b;
-                png = p;
-            }
-        }
-
-        final List<Rec> images = new ArrayList<>();
-
-        @Override
-        protected void processOperator(Operator operator, List<COSBase> operands) throws IOException {
-
-            if ("Do".equals(operator.getName())) {
-                COSName name = (COSName) operands.get(0);
-                PDXObject xObject = getResources().getXObject(name);
-                if (xObject instanceof PDImageXObject img) {
-
-                    AffineTransform ctm = getGraphicsState()
-                            .getCurrentTransformationMatrix().createAffineTransform();
-
-                    float w = img.getWidth();
-                    float h = img.getHeight();
-                    Point2D[] pts = {
-                            ctm.transform(new Point2D.Float(0, 0), null),
-                            ctm.transform(new Point2D.Float(w, 0), null),
-                            ctm.transform(new Point2D.Float(w, h), null),
-                            ctm.transform(new Point2D.Float(0, h), null)
-                    };
-                    double minX = Arrays.stream(pts)
-                            .mapToDouble(Point2D::getX).min().orElse(0);
-                    double maxX = Arrays.stream(pts)
-                            .mapToDouble(Point2D::getX).max().orElse(0);
-                    double minY = Arrays.stream(pts)
-                            .mapToDouble(Point2D::getY).min().orElse(0);
-                    double maxY = Arrays.stream(pts)
-                            .mapToDouble(Point2D::getY).max().orElse(0);
-
-                    Rectangle2D rect = new Rectangle2D.Double(
-                            minX, minY, maxX - minX, maxY - minY);
-
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    BufferedImage bi = img.getImage();
-                    ImageIO.write(bi, "png", baos);
-                    images.add(new Rec(rect, baos.toByteArray()));
-                    return;
-                }
-            }
-            super.processOperator(operator, operands);
-        }
-    }
-
-    /*───────────────────────── DTO & UTIL ─────────────────────────*/
-
-    private static class ImageRec {
-        final float x, y, w, h;
-        final String b64;
-
-        ImageRec(float x, float y, float w, float h, String b) {
-            this.x = x;
-            this.y = y;
-            this.w = w;
-            this.h = h;
-            this.b64 = b;
-        }
-    }
+    /*──────────────────── DTO & UTIL ───────────────────*/
 
     private static class Box {
         final float x, y, w, h;
@@ -330,23 +223,15 @@ public class DocumentExtractor {
             h = (float) (p.getDouble(5) - p.getDouble(1)) * dpi;
         }
 
-        Box(ImageRec im) {
-            x = im.x;
-            y = im.y;
-            w = im.w;
-            h = im.h;
-        }
-
         static boolean insideAny(JSONObject word, float dpi, List<Box> boxes) {
             JSONArray p = word.getJSONArray("polygon");
-            float x0 = (float) p.getDouble(0) * dpi;
-            float y0 = (float) p.getDouble(1) * dpi;
-            float x1 = (float) p.getDouble(4) * dpi;
-            float y1 = (float) p.getDouble(5) * dpi;
+            float x0 = (float) p.getDouble(0) * dpi,
+                    y0 = (float) p.getDouble(1) * dpi,
+                    x1 = (float) p.getDouble(4) * dpi,
+                    y1 = (float) p.getDouble(5) * dpi;
             for (Box b : boxes)
                 if (x0 >= b.x - 1 && x1 <= b.x + b.w + 1 &&
-                        y0 >= b.y - 1 && y1 <= b.y + b.h + 1)
-                    return true;
+                        y0 >= b.y - 1 && y1 <= b.y + b.h + 1) return true;
             return false;
         }
     }
@@ -412,6 +297,8 @@ public class DocumentExtractor {
     }
 
     private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }
