@@ -6,4 +6,5 @@ import java.io.IOException;
 public interface DocumentTranslator {
 
     String translateDocument(File inputFile, String targetLanguage) throws IOException;
+
 }

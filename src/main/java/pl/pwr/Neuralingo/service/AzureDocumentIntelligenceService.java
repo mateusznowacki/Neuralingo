@@ -117,4 +117,14 @@ public class AzureDocumentIntelligenceService {
 
         throw new RuntimeException("Przekroczono czas oczekiwania na wynik modelu");
     }
+
+    public JSONObject analyzeLayout(byte[] fileBytes, String fileType) {
+        try {
+            CompletableFuture<JSONObject> layoutFuture = sendToModel(LAYOUT_MODEL, LAYOUT_API_VERSION, fileBytes, fileType, "layout");
+            return layoutFuture.get();
+        } catch (Exception e) {
+            throw new RuntimeException("Błąd podczas pobierania layout: " + e.getMessage(), e);
+        }
+    }
+
 }

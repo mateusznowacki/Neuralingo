@@ -6,7 +6,7 @@ import pl.pwr.Neuralingo.translation.file.pptx.PptxTranslator;
 import pl.pwr.Neuralingo.translation.file.vsdx.VisioTranslator;
 import pl.pwr.Neuralingo.translation.file.word.WordTranslator;
 import pl.pwr.Neuralingo.translation.file.xlsx.ExcelTranslator;
-import pl.pwr.Neuralingo.translation.ocr.word.WordOcrTranslator;
+import pl.pwr.Neuralingo.translation.ocr.OcrTranslator;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,17 +20,18 @@ public class DocumentTranslationFacade {
     private final ExcelTranslator excelTranslator;
     private final PptxTranslator pptxTranslator;
     private final VisioTranslator visioTranslator;
-    private final WordOcrTranslator wordOcrTranslator;
+    private final OcrTranslator ocrTranslator;
+
 
     public DocumentTranslationFacade(WordTranslator wordTranslator, PdfTranslator pdfTranslator
-            , ExcelTranslator excelTranslator, PptxTranslator pptxTranslator, VisioTranslator visioTranslator
-            , WordOcrTranslator wordOcrTranslator) {
+            , ExcelTranslator excelTranslator, PptxTranslator pptxTranslator, VisioTranslator visioTranslator,
+                                     OcrTranslator ocrTranslator) {
         this.wordTranslator = wordTranslator;
         this.pdfTranslator = pdfTranslator;
         this.excelTranslator = excelTranslator;
         this.pptxTranslator = pptxTranslator;
         this.visioTranslator = visioTranslator;
-        this.wordOcrTranslator = wordOcrTranslator;
+        this.ocrTranslator = ocrTranslator;
     }
 
     public String translateFileDocument(File file, String targetLanguage) throws IOException {
@@ -55,9 +56,9 @@ public class DocumentTranslationFacade {
         String fileName = file.getName().toLowerCase();
 
         if (fileName.endsWith(".docx")) {
-            return wordOcrTranslator.translateDocument(file, targetLanguage);
+            return ocrTranslator.translateDocument(file, targetLanguage);
         } else if (fileName.endsWith(".pdf")) {
-            return pdfTranslator.translateDocument(file, targetLanguage);
+            return ocrTranslator.translateDocument(file, targetLanguage);
         } else {
             throw new IllegalArgumentException("Nieobsługiwane rozszerzenie pliku: " + fileName);
         }
