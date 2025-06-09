@@ -1,11 +1,27 @@
 package pl.pwr.Neuralingo.translation.ocr;
 
+import org.apache.pdfbox.contentstream.PDFStreamEngine;
+import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.cos.COSBase;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.io.MemoryUsageSetting;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.pwr.Neuralingo.service.AzureDocumentIntelligenceService;
 
+import javax.imageio.ImageIO;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,202 +34,368 @@ public class DocumentExtractor {
     private AzureDocumentIntelligenceService azure;
 
     public String extractTextAsHtml(File inputFile) throws IOException {
+
         byte[] bytes = Files.readAllBytes(inputFile.toPath());
         JSONObject root = azure.analyzeLayout(bytes, detectFileType(inputFile));
 
+        Map<Integer, Style> styleMap = Style.build(
+                root.getJSONObject("analyzeResult").optJSONArray("styles"));
+
+        Map<Integer, List<ImageRec>> images =
+                inputFile.getName().toLowerCase().endsWith(".pdf")
+                        ? extractImagesFromPdf(inputFile)
+                        : Map.of();
+
         StringBuilder html = new StringBuilder("""
-                    <!DOCTYPE html><html><head><meta charset="UTF-8">
-                    <style>
-                      body{background:#fff}
-                      .page{position:relative;border:1px solid #000;margin:20px auto}
-                      .text{position:absolute;white-space:pre}
-                      .tableWrap{position:absolute}
-                      .table{display:grid;border:1px solid #000;border-collapse:collapse;width:100%;height:100%}
-                      .cell{border:1px solid #888;padding:4px;white-space:pre}
-                    </style></head><body>
-                """);
+                <!DOCTYPE html><html><head><meta charset="UTF-8">
+                <style>
+                   body{background:#fff;margin:0}
+                   .page{position:relative;border:1px solid #000;margin:20px auto}
+                   .text{position:absolute;white-space:pre}
+                   .img{position:absolute;z-index:-100}
+                   .tableWrap{position:absolute}
+                   .table{display:grid;border:1px solid #000;border-collapse:collapse;width:100%;height:100%}
+                   .cell{border:1px solid #888;padding:4px;white-space:pre}
+                </style></head><body>""");
 
         JSONArray pages = root.getJSONObject("analyzeResult").getJSONArray("pages");
         JSONArray tables = root.getJSONObject("analyzeResult").optJSONArray("tables");
 
-        Map<Integer, List<TableBox>> pageTableBoxes = groupTableBoxesByPage(tables);
-
         for (int p = 0; p < pages.length(); p++) {
+
             JSONObject page = pages.getJSONObject(p);
-            int pageNum = page.getInt("pageNumber");
-            float dpi = dpi(page.optString("unit", "pixel"));
-            float PW = page.getFloat("width") * dpi, PH = page.getFloat("height") * dpi;
+            float dpi = toPx(page.optString("unit", "pixel"));
+            float pageWidthPx = (float) page.getDouble("width") * dpi;
+            float pageHeightPx = (float) page.getDouble("height") * dpi;
+            int pageNo = page.getInt("pageNumber");
 
-            html.append(String.format("<div class=\"page\" style=\"width:%.0fpx;height:%.0fpx;\">", PW, PH));
+            html.append("<div class=\"page\" style=\"width:").append(pageWidthPx)
+                    .append("px;height:").append(pageHeightPx).append("px;\">");
 
-            // ---- render tables first ----
-            if (pageTableBoxes.containsKey(pageNum)) {
-                for (TableBox tb : pageTableBoxes.get(pageNum)) {
-                    renderTable(html, tb.table, dpi);
+            /* obrazy */
+            for (ImageRec im : images.getOrDefault(pageNo, List.of()))
+                html.append(String.format(
+                        "<img class=\"img\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;\" src=\"data:image/png;base64,%s\"/>",
+                        im.x, im.y, im.w, im.h, im.b64));
+
+            /* tabele */
+            if (tables != null)
+                for (int t = 0; t < tables.length(); t++) {
+                    JSONObject tb = tables.getJSONObject(t);
+                    if (tb.getJSONArray("boundingRegions").getJSONObject(0)
+                            .getInt("pageNumber") == pageNo)
+                        renderTable(html, tb, dpi, styleMap);
                 }
-            }
 
-            // ---- render words, skipping those that belong to tables ----
-            renderWords(html, page.optJSONArray("words"), dpi, pageTableBoxes.getOrDefault(pageNum, List.of()));
+            /* tekst */
+            renderWords(html, page, dpi, styleMap,
+                    tables, images.getOrDefault(pageNo, List.of()));
 
             html.append("</div>");
         }
+
         html.append("</body></html>");
         return html.toString();
     }
 
-    /* ---------------- WORDS ---------------- */
-    private void renderWords(StringBuilder html, JSONArray words, float dpi, List<TableBox> boxes) {
-        if (words == null || words.isEmpty()) return;
+    /*──────────────────────────── TEXT ────────────────────────────*/
+
+    private void renderWords(StringBuilder html, JSONObject page, float dpi,
+                             Map<Integer, Style> styleMap,
+                             JSONArray allTables, List<ImageRec> imgs) {
+
+        JSONArray words = page.optJSONArray("words");
+        if (words == null) return;
+
+        List<Box> masks = new ArrayList<>();
+        if (allTables != null)
+            for (int i = 0; i < allTables.length(); i++) {
+                JSONObject tb = allTables.getJSONObject(i);
+                if (tb.getJSONArray("boundingRegions").getJSONObject(0)
+                        .getInt("pageNumber") == page.getInt("pageNumber"))
+                    masks.add(new Box(tb.getJSONArray("boundingRegions").getJSONObject(0), dpi));
+            }
+        imgs.forEach(im -> masks.add(new Box(im)));
 
         TreeMap<Float, List<JSONObject>> lines = new TreeMap<>();
-        float tol = 2f;
-
         for (int i = 0; i < words.length(); i++) {
             JSONObject w = words.getJSONObject(i);
-            if (isInsideTable(w, dpi, boxes)) continue;     // pomiń jeśli słowo jest w tabeli
-            float y = w.getJSONArray("polygon").getFloat(1) * dpi;
-            Float key = lines.keySet().stream().filter(k -> Math.abs(k - y) <= tol).findFirst().orElse(y);
+            if (Box.insideAny(w, dpi, masks)) continue;
+
+            float y = (float) w.getJSONArray("polygon").getDouble(1) * dpi;
+            Float key = lines.keySet().stream()
+                    .filter(k -> Math.abs(k - y) <= 2).findFirst().orElse(y);
             lines.computeIfAbsent(key, k -> new ArrayList<>()).add(w);
         }
 
-        for (var e : lines.entrySet()) {
-            List<JSONObject> lw = e.getValue();
-            lw.sort(Comparator.comparingDouble(w -> w.getJSONArray("polygon").getFloat(0)));
+        for (List<JSONObject> ln : lines.values()) {
+            ln.sort(Comparator.comparingDouble(
+                    w -> w.getJSONArray("polygon").getDouble(0)));
 
-            float minX = Float.MAX_VALUE, minY = e.getKey(), maxX = 0, maxY = 0;
-            Set<String> colors = new HashSet<>(), fonts = new HashSet<>();
-            Set<Float> sizes = new HashSet<>();
-            Set<Boolean> bolds = new HashSet<>(), itals = new HashSet<>();
-
-            for (JSONObject w : lw) {
-                JSONObject s = span(w);
-                colors.add(s.optString("color", "#000"));
-                fonts.add(s.optString("fontName", "Arial"));
-                sizes.add((float) s.optDouble("fontSize", 12));
-                String st = s.optString("styleName", "");
-                bolds.add(st.toLowerCase().contains("bold"));
-                itals.add(st.toLowerCase().contains("italic"));
-
+            float left = Float.MAX_VALUE, right = 0, top = 0, bottom = 0;
+            Set<Integer> styleIds = new HashSet<>();
+            for (JSONObject w : ln) {
+                styleIds.add(styleIdOf(w));
                 JSONArray poly = w.getJSONArray("polygon");
-                float x0 = poly.getFloat(0) * dpi, y0 = poly.getFloat(1) * dpi;
-                float x4 = poly.getFloat(4) * dpi, y5 = poly.getFloat(5) * dpi;
-                minX = Math.min(minX, x0);
-                maxX = Math.max(maxX, x4);
-                maxY = Math.max(maxY, y5);
+                float x0 = (float) poly.getDouble(0) * dpi;
+                float y0 = (float) poly.getDouble(1) * dpi;
+                float x4 = (float) poly.getDouble(4) * dpi;
+                float y5 = (float) poly.getDouble(5) * dpi;
+                left = Math.min(left, x0);
+                right = Math.max(right, x4);
+                top = y0;
+                bottom = Math.max(bottom, y5);
             }
-            float width = maxX - minX, height = maxY - minY;
-            boolean uni = colors.size() == 1 && fonts.size() == 1 && sizes.size() == 1 && bolds.size() == 1 && itals.size() == 1;
-            StringBuilder txt = new StringBuilder();
-
-            for (JSONObject w : lw) {
-                if (txt.length() > 0) txt.append(" ");
-                if (uni) {
-                    txt.append(esc(w.getString("content")));
-                } else {
-                    JSONObject s = span(w);
-                    String col = s.optString("color", "#000"), font = s.optString("fontName", "Arial");
-                    float fs = (float) s.optDouble("fontSize", 12);
-                    boolean b = s.optString("styleName", "").toLowerCase().contains("bold");
-                    boolean i = s.optString("styleName", "").toLowerCase().contains("italic");
-                    txt.append(String.format(
-                            "<span style=\"font-family:'%s';font-size:%.1fpx;color:%s;font-weight:%s;font-style:%s;\">%s</span>",
-                            esc(font), fs, col, b ? "bold" : "normal", i ? "italic" : "normal", esc(w.getString("content"))));
-                }
+            float width = right - left;
+            float height = bottom - top;
+            boolean uniform = styleIds.size() == 1;
+            StringBuilder text = new StringBuilder();
+            for (JSONObject w : ln) {
+                if (text.length() > 0) text.append(' ');
+                Style st = styleMap.getOrDefault(styleIdOf(w), Style.DEFAULT);
+                text.append(uniform ? escape(w.getString("content"))
+                        : st.wrap(escape(w.getString("content"))));
             }
-            if (uni) {
-                String col = colors.iterator().next(), font = fonts.iterator().next();
-                float fs = sizes.iterator().next();
-                boolean b = bolds.iterator().next(), i = itals.iterator().next();
-                html.append(String.format(
-                        "<div class=\"text\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;font-family:'%s';font-size:%.1fpx;color:%s;font-weight:%s;font-style:%s;\">%s</div>",
-                        minX, minY, width, height, esc(font), fs, col, b ? "bold" : "normal", i ? "italic" : "normal", txt));
-            } else {
-                html.append(String.format(
-                        "<div class=\"text\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;\">%s</div>",
-                        minX, minY, width, height, txt));
-            }
+            Style lineStyle = styleMap.getOrDefault(styleIds.iterator().next(),
+                    Style.DEFAULT);
+            html.append(String.format(
+                    "<div class=\"text\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;%s\">%s</div>",
+                    left, top, width, height, uniform ? lineStyle.css() : "", text));
         }
     }
 
-    /* ---------------- TABLES ---------------- */
-    private void renderTable(StringBuilder html, JSONObject table, float dpi) {
-        TableBox tb = new TableBox(table, dpi);
-        int cols = table.getInt("columnCount");
+    private static int styleIdOf(JSONObject o) {
+        JSONObject span = o.optJSONObject("span");
+        if (span != null) return span.optInt("style", -1);
+        JSONArray spans = o.optJSONArray("spans");
+        return spans != null && spans.length() > 0
+                ? spans.getJSONObject(0).optInt("style", -1)
+                : -1;
+    }
+
+    /*────────────────────────── TABLES ────────────────────────────*/
+
+    private void renderTable(StringBuilder html, JSONObject tb, float dpi,
+                             Map<Integer, Style> styleMap) {
+
+        Box box = new Box(tb.getJSONArray("boundingRegions").getJSONObject(0), dpi);
+        int cols = tb.getInt("columnCount");
 
         html.append(String.format(
                 "<div class=\"tableWrap\" style=\"left:%.2fpx;top:%.2fpx;width:%.2fpx;height:%.2fpx;\">",
-                tb.x, tb.y, tb.w, tb.h));
-        html.append("<div class=\"table\" style=\"grid-template-columns:repeat(")
+                        box.x, box.y, box.w, box.h))
+                .append("<div class=\"table\" style=\"grid-template-columns:repeat(")
                 .append(cols).append(",1fr);\">");
 
-        JSONArray cells = table.getJSONArray("cells");
+        JSONArray cells = tb.getJSONArray("cells");
         for (int i = 0; i < cells.length(); i++) {
             JSONObject c = cells.getJSONObject(i);
-            int r = c.optInt("rowIndex") + 1, col = c.optInt("columnIndex") + 1;
-            int rs = c.optInt("rowSpan", 1), cs = c.optInt("columnSpan", 1);
-            String cnt = esc(c.getString("content").trim());
-
-            JSONObject sp = c.has("spans") && c.getJSONArray("spans").length() > 0 ? c.getJSONArray("spans").getJSONObject(0) : new JSONObject();
-            String font = sp.optString("fontName", "Arial");
-            float fs = (float) sp.optDouble("fontSize", 12);
-            String colr = sp.optString("color", "#000");
-            boolean b = sp.optString("styleName", "").toLowerCase().contains("bold");
-            boolean it = sp.optString("styleName", "").toLowerCase().contains("italic");
+            int row = c.getInt("rowIndex") + 1;
+            int col = c.getInt("columnIndex") + 1;
+            int rs = c.optInt("rowSpan", 1);
+            int cs = c.optInt("columnSpan", 1);
+            Style st = styleMap.getOrDefault(styleIdOf(c), Style.DEFAULT);
 
             html.append(String.format(
-                    "<div class=\"cell\" style=\"grid-row:%d/span %d;grid-column:%d/span %d;font-family:'%s';font-size:%.1fpx;color:%s;font-weight:%s;font-style:%s;\">%s</div>",
-                    r, rs, col, cs, esc(font), fs, colr, b ? "bold" : "normal", it ? "italic" : "normal", cnt));
+                    "<div class=\"cell\" style=\"grid-row:%d/span %d;grid-column:%d/span %d;%s\">%s</div>",
+                    row, rs, col, cs, st.css(),
+                    escape(c.getString("content").trim())));
         }
         html.append("</div></div>");
     }
 
-    private Map<Integer, List<TableBox>> groupTableBoxesByPage(JSONArray tables) {
-        Map<Integer, List<TableBox>> map = new HashMap<>();
-        if (tables == null) return map;
-        for (int i = 0; i < tables.length(); i++) {
-            JSONObject t = tables.getJSONObject(i);
-            int pg = t.getJSONArray("boundingRegions").getJSONObject(0).getInt("pageNumber");
-            map.computeIfAbsent(pg, k -> new ArrayList<>()).add(new TableBox(t, dpi("inch"))); // dpi val replaced later
+    /*───────────────────────── IMAGES ─────────────────────────────*/
+
+    private Map<Integer, List<ImageRec>> extractImagesFromPdf(File pdf) throws IOException {
+
+        try (PDDocument doc = PDDocument.load(pdf, MemoryUsageSetting.setupTempFileOnly())) {
+
+            Map<Integer, List<ImageRec>> map = new HashMap<>();
+            int pageNo = 1;
+            float pxPerPt = 96f / 72f;
+            Base64.Encoder base64 = Base64.getEncoder();
+
+            for (PDPage page : doc.getPages()) {
+
+                PDRectangle crop = page.getCropBox();
+                float pageHeightPx = crop.getHeight() * pxPerPt;
+
+                ImageCollector collector = new ImageCollector();
+                collector.processPage(page);
+
+                List<ImageRec> list = new ArrayList<>();
+                for (ImageCollector.Rec rec : collector.images) {
+
+                    double adjX = rec.bounds.getMinX() - crop.getLowerLeftX();
+                    double adjY = rec.bounds.getMinY() - crop.getLowerLeftY();
+
+                    float xPx = (float) adjX * pxPerPt;
+                    float yPx = pageHeightPx - (float) (rec.bounds.getMaxY() - crop.getLowerLeftY()) * pxPerPt;
+                    float wPx = (float) rec.bounds.getWidth() * pxPerPt;
+                    float hPx = (float) rec.bounds.getHeight() * pxPerPt;
+
+                    if (xPx + wPx > crop.getWidth() * pxPerPt) {
+                        float ratio = (crop.getWidth() * pxPerPt - xPx) / wPx;
+                        wPx *= ratio;
+                        hPx *= ratio;
+                    }
+                    list.add(new ImageRec(xPx, yPx, wPx, hPx,
+                            base64.encodeToString(rec.png)));
+                }
+                map.put(pageNo++, list);
+            }
+            return map;
         }
-        return map;
     }
 
-    private boolean isInsideTable(JSONObject word, float dpi, List<TableBox> boxes) {
-        if (boxes.isEmpty()) return false;
-        JSONArray poly = word.getJSONArray("polygon");
-        float x0 = poly.getFloat(0) * dpi, y0 = poly.getFloat(1) * dpi;
-        float x4 = poly.getFloat(4) * dpi, y5 = poly.getFloat(5) * dpi;
-        for (TableBox b : boxes) {
-            if (x0 >= b.x && x4 <= b.x + b.w && y0 >= b.y && y5 <= b.y + b.h) return true;
+    private static class ImageCollector extends PDFStreamEngine {
+
+        private static class Rec {
+            final Rectangle2D bounds;
+            final byte[] png;
+
+            Rec(Rectangle2D b, byte[] p) {
+                bounds = b;
+                png = p;
+            }
         }
-        return false;
+
+        final List<Rec> images = new ArrayList<>();
+
+        @Override
+        protected void processOperator(Operator operator, List<COSBase> operands) throws IOException {
+
+            if ("Do".equals(operator.getName())) {
+                COSName name = (COSName) operands.get(0);
+                PDXObject xObject = getResources().getXObject(name);
+                if (xObject instanceof PDImageXObject img) {
+
+                    AffineTransform ctm = getGraphicsState()
+                            .getCurrentTransformationMatrix().createAffineTransform();
+
+                    float w = img.getWidth();
+                    float h = img.getHeight();
+                    Point2D[] pts = {
+                            ctm.transform(new Point2D.Float(0, 0), null),
+                            ctm.transform(new Point2D.Float(w, 0), null),
+                            ctm.transform(new Point2D.Float(w, h), null),
+                            ctm.transform(new Point2D.Float(0, h), null)
+                    };
+                    double minX = Arrays.stream(pts)
+                            .mapToDouble(Point2D::getX).min().orElse(0);
+                    double maxX = Arrays.stream(pts)
+                            .mapToDouble(Point2D::getX).max().orElse(0);
+                    double minY = Arrays.stream(pts)
+                            .mapToDouble(Point2D::getY).min().orElse(0);
+                    double maxY = Arrays.stream(pts)
+                            .mapToDouble(Point2D::getY).max().orElse(0);
+
+                    Rectangle2D rect = new Rectangle2D.Double(
+                            minX, minY, maxX - minX, maxY - minY);
+
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    BufferedImage bi = img.getImage();
+                    ImageIO.write(bi, "png", baos);
+                    images.add(new Rec(rect, baos.toByteArray()));
+                    return;
+                }
+            }
+            super.processOperator(operator, operands);
+        }
     }
 
-    private static class TableBox {
-        final JSONObject table;
+    /*───────────────────────── DTO & UTIL ─────────────────────────*/
+
+    private static class ImageRec {
+        final float x, y, w, h;
+        final String b64;
+
+        ImageRec(float x, float y, float w, float h, String b) {
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+            this.b64 = b;
+        }
+    }
+
+    private static class Box {
         final float x, y, w, h;
 
-        TableBox(JSONObject t, float dpi) {
-            table = t;
-            JSONArray box = t.getJSONArray("boundingRegions").getJSONObject(0)
-                    .optJSONArray("boundingBox");
-            if (box == null) box = t.getJSONArray("boundingRegions").getJSONObject(0).getJSONArray("polygon");
-            float minX = box.getFloat(0), minY = box.getFloat(1), maxX = box.getFloat(4), maxY = box.getFloat(5);
-            x = minX * dpi;
-            y = minY * dpi;
-            w = (maxX - minX) * dpi;
-            h = (maxY - minY) * dpi;
+        Box(JSONObject region, float dpi) {
+            JSONArray p = region.getJSONArray("polygon");
+            x = (float) p.getDouble(0) * dpi;
+            y = (float) p.getDouble(1) * dpi;
+            w = (float) (p.getDouble(4) - p.getDouble(0)) * dpi;
+            h = (float) (p.getDouble(5) - p.getDouble(1)) * dpi;
+        }
+
+        Box(ImageRec im) {
+            x = im.x;
+            y = im.y;
+            w = im.w;
+            h = im.h;
+        }
+
+        static boolean insideAny(JSONObject word, float dpi, List<Box> boxes) {
+            JSONArray p = word.getJSONArray("polygon");
+            float x0 = (float) p.getDouble(0) * dpi;
+            float y0 = (float) p.getDouble(1) * dpi;
+            float x1 = (float) p.getDouble(4) * dpi;
+            float y1 = (float) p.getDouble(5) * dpi;
+            for (Box b : boxes)
+                if (x0 >= b.x - 1 && x1 <= b.x + b.w + 1 &&
+                        y0 >= b.y - 1 && y1 <= b.y + b.h + 1)
+                    return true;
+            return false;
         }
     }
 
-    /* ---------- helpers ---------- */
-    private static JSONObject span(JSONObject w) {
-        return w.has("spans") && w.getJSONArray("spans").length() > 0
-                ? w.getJSONArray("spans").getJSONObject(0) : new JSONObject();
+    private static class Style {
+
+        static final Style DEFAULT = new Style("Arial", 12, "#000", false, false);
+
+        final String font, color;
+        final float size;
+        final boolean bold, italic;
+
+        Style(String font, float size, String color, boolean bold, boolean italic) {
+            this.font = font;
+            this.size = size;
+            this.color = color;
+            this.bold = bold;
+            this.italic = italic;
+        }
+
+        String css() {
+            return "font-family:'" + escape(font) + "';font-size:" + size + "px;"
+                    + "color:" + color + ';'
+                    + "font-weight:" + (bold ? "bold" : "normal") + ';'
+                    + "font-style:" + (italic ? "italic" : "normal") + ';';
+        }
+
+        String wrap(String t) {
+            return "<span style=\"" + css() + "\">" + t + "</span>";
+        }
+
+        static Map<Integer, Style> build(JSONArray arr) {
+            Map<Integer, Style> map = new HashMap<>();
+            if (arr == null) return map;
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                JSONObject f = o.optJSONObject("font");
+                map.put(i, new Style(
+                        f != null ? f.optString("fontName", "Arial") : "Arial",
+                        f != null ? (float) f.optDouble("fontSize", 12) : 12,
+                        f != null ? f.optString("color", "#000") : "#000",
+                        o.optBoolean("isBold", false),
+                        o.optBoolean("isItalic", false)));
+            }
+            return map;
+        }
     }
 
-    private static float dpi(String unit) {
+    private static float toPx(String unit) {
         return switch (unit) {
             case "inch" -> 96f;
             case "point" -> 96f / 72f;
@@ -221,14 +403,15 @@ public class DocumentExtractor {
         };
     }
 
-    private static String detectFileType(File f) {
-        String n = f.getName().toLowerCase();
+    private static String detectFileType(File file) {
+        String n = file.getName().toLowerCase();
         if (n.endsWith(".pdf")) return "application/pdf";
-        if (n.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        throw new RuntimeException("Nieznany typ: " + n);
+        if (n.endsWith(".docx"))
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        throw new RuntimeException("Nieznany typ pliku: " + n);
     }
 
-    private static String esc(String s) {
+    private static String escape(String s) {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }
