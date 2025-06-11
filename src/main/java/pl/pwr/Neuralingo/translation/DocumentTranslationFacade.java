@@ -54,10 +54,7 @@ public class DocumentTranslationFacade {
 
     public String translateOcrDocument(File file, String targetLanguage) throws IOException {
         String fileName = file.getName().toLowerCase();
-
-        if (fileName.endsWith(".docx")) {
-            return ocrTranslator.translateDocument(file, targetLanguage);
-        } else if (fileName.endsWith(".pdf")) {
+        if (fileName.endsWith(".pdf")) {
             return ocrTranslator.translateDocument(file, targetLanguage);
         } else {
             throw new IllegalArgumentException("Nieobsługiwane rozszerzenie pliku: " + fileName);

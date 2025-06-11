@@ -9,8 +9,6 @@ import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.service.TranslationService;
 import pl.pwr.Neuralingo.translation.ocr.OcrTranslator;
 
-import java.io.File;
-
 @RestController
 @RequestMapping("/api/translate")
 public class TranslatorController {
@@ -39,19 +37,6 @@ public class TranslatorController {
                                                                 @RequestParam String targetLanguage,
                                                                 Authentication auth) {
         return translationService.handleTranslation(id, targetLanguage, true, auth);
-    }
-
-    @PostMapping("/test")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<String> testOcr(@RequestParam String targetLanguage, Authentication auth) {
-        try {
-            File inputFile = new File("/home/mateusz-nowacki/Documents/Tekst, obrazek, tabelka - Procedura diagnostyki i naprawy układu hamulcoweg2.pdf");
-            String html = ocrTranslator.translateDocument(inputFile, targetLanguage);
-            return ResponseEntity.ok(html);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("Translation failed: " + e.getMessage());
-        }
     }
 
 
