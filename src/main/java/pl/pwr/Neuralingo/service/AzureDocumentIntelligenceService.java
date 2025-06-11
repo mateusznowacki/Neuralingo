@@ -9,11 +9,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -75,13 +70,6 @@ public class AzureDocumentIntelligenceService {
                         .orElseThrow(() -> new RuntimeException("Brak operation-location dla modelu " + model));
 
                 JSONObject root = pollForResult(opLoc);
-
-                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-                String filename = "response_" + suffix + "_" + timestamp + ".json";
-                Path outputPath = Path.of("responses", filename);
-                Files.createDirectories(outputPath.getParent());
-                Files.writeString(outputPath, root.toString(2), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
 
                 return root;
 

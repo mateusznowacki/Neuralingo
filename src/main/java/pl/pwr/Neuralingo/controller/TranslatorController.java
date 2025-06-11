@@ -7,7 +7,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import pl.pwr.Neuralingo.dto.DocumentDTO;
 import pl.pwr.Neuralingo.service.TranslationService;
-import pl.pwr.Neuralingo.translation.ocr.OcrTranslator;
 
 @RestController
 @RequestMapping("/api/translate")
@@ -15,12 +14,10 @@ public class TranslatorController {
 
     private final TranslationService translationService;
 
-    private final OcrTranslator ocrTranslator;
-
     @Autowired
-    public TranslatorController(TranslationService translationService, OcrTranslator ocrTranslator) {
+    public TranslatorController(TranslationService translationService) {
         this.translationService = translationService;
-        this.ocrTranslator = ocrTranslator;
+
     }
 
     @PostMapping("/document/{id}")
@@ -38,7 +35,6 @@ public class TranslatorController {
                                                                 Authentication auth) {
         return translationService.handleTranslation(id, targetLanguage, true, auth);
     }
-
 
 
 }
