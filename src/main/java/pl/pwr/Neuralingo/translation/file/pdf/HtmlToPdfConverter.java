@@ -13,7 +13,7 @@ import java.nio.file.Paths;
 @Component
 public class HtmlToPdfConverter {
 
-    private final Path scriptsDir = Paths.get("scripts");
+    private final Path scriptsDir = Paths.get(".");
 
 
 //    public HtmlToPdfConverter() {

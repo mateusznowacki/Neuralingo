@@ -65,6 +65,7 @@ public class AzureDocumentIntelligenceService {
                     throw new RuntimeException("Błąd " + submitResponse.statusCode() + " od modelu " + model + ": " + submitResponse.body());
                 }
 
+
                 String opLoc = submitResponse.headers()
                         .firstValue("operation-location")
                         .orElseThrow(() -> new RuntimeException("Brak operation-location dla modelu " + model));
