@@ -92,7 +92,7 @@ public class VisioTextReplacer {
         return resultFile;
     }
 
-    private String preserveSpaces(String original, String translated) {
+    String preserveSpaces(String original, String translated) {
         if (original.startsWith(" ") && !translated.startsWith(" ")) {
             translated = " " + translated;
         }
